@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+.env
+.env.*
+agent.db
+agent.db.bak.*
+sessions/
+global_model.json
+session_aliases.json
+.DS_Store
+Thumbs.db
