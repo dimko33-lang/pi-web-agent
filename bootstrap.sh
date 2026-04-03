@@ -1,34 +1,48 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+trap 'echo "ERROR: line $LINENO: $BASH_COMMAND" >&2' ERR
+
+export DEBIAN_FRONTEND=noninteractive
 
 REPO_URL="${REPO_URL:-https://github.com/dimko33-lang/pi-web-agent.git}"
-WORKDIR="/root/pi-web-agent-src"
+REPO_REF="${REPO_REF:-main}"
+WORKDIR="${WORKDIR:-/root/pi-web-agent-src}"
+
+log() {
+  echo
+  echo "==> $*"
+}
+
+aptx() {
+  apt-get -o DPkg::Lock::Timeout=300 -o Acquire::Retries=3 "$@"
+}
 
 if [ "$(id -u)" -ne 0 ]; then
-  echo "Please run as root (or with sudo)."
+  echo "Run as root."
   exit 1
 fi
 
-while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
-  echo "Waiting for dpkg lock..."
-  sleep 2
-done
+if command -v cloud-init >/dev/null 2>&1; then
+  log "Waiting for cloud-init"
+  cloud-init status --wait || true
+fi
 
-apt update
-apt install -y git
+log "Installing git"
+aptx update
+aptx install -y git ca-certificates
 
+log "Cloning repo"
 rm -rf "$WORKDIR"
-git clone "$REPO_URL" "$WORKDIR"
+git clone --depth 1 --branch "$REPO_REF" "$REPO_URL" "$WORKDIR"
 
-if ! cd "$WORKDIR"; then
-  echo "ERROR: Can't cd to $WORKDIR"
-  exit 1
-fi
+cd "$WORKDIR"
 
 if [ ! -f install.sh ]; then
-  echo "ERROR: install.sh not found in $WORKDIR"
+  echo "install.sh not found"
   exit 1
 fi
 
 chmod +x install.sh
-exec bash install.sh
+
+log "Running install.sh"
+./install.sh
