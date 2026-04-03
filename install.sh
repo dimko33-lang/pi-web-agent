@@ -1,6 +1,8 @@
-
 #!/usr/bin/env bash
 set -Eeuo pipefail
+trap 'echo "ERROR: line $LINENO: $BASH_COMMAND" >&2' ERR
+
+export DEBIAN_FRONTEND=noninteractive
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_DIR="/opt/my-agent"
@@ -10,37 +12,79 @@ SERVICE_FILE="/etc/systemd/system/my-agent.service"
 NGINX_SITE="/etc/nginx/sites-available/my-agent"
 NGINX_LINK="/etc/nginx/sites-enabled/my-agent"
 
+log() {
+  echo
+  echo "==> $*"
+}
+
+aptx() {
+  apt-get -o DPkg::Lock::Timeout=300 -o Acquire::Retries=3 "$@"
+}
+
 if [ "$(id -u)" -ne 0 ]; then
   echo "Run as root."
   exit 1
 fi
 
+if ! command -v systemctl >/dev/null 2>&1; then
+  echo "systemd not found. This script needs a normal Ubuntu server."
+  exit 1
+fi
+
 DEFAULT_IP="$(hostname -I | awk '{print $1}')"
-read -rp "Public host/IP [$DEFAULT_IP]: " PUBLIC_HOST
-PUBLIC_HOST="${PUBLIC_HOST:-$DEFAULT_IP}"
+
+PUBLIC_HOST="${PUBLIC_HOST:-}"
+GROQ_API_KEY="${GROQ_API_KEY:-}"
+OPENROUTER_API_KEY="${OPENROUTER_API_KEY:-}"
+KIMI_API_KEY="${KIMI_API_KEY:-}"
+
+# Если есть нормальная консоль — можно спросить
+if [ -t 0 ]; then
+  if [ -z "$PUBLIC_HOST" ]; then
+    read -rp "Public host/IP [$DEFAULT_IP]: " PUBLIC_HOST
+    PUBLIC_HOST="${PUBLIC_HOST:-$DEFAULT_IP}"
+  fi
+
+  if [ -z "$GROQ_API_KEY" ]; then
+    read -srp "GROQ_API_KEY: " GROQ_API_KEY
+    echo
+  fi
+
+  if [ -z "$OPENROUTER_API_KEY" ]; then
+    read -srp "OPENROUTER_API_KEY (optional): " OPENROUTER_API_KEY
+    echo
+  fi
+
+  if [ -z "$KIMI_API_KEY" ]; then
+    read -srp "KIMI_API_KEY (optional): " KIMI_API_KEY
+    echo
+  fi
+else
+  # Если установка идет автоматом — не спрашиваем ничего
+  PUBLIC_HOST="${PUBLIC_HOST:-$DEFAULT_IP}"
+fi
+
+if [ -z "$GROQ_API_KEY" ]; then
+  echo "GROQ_API_KEY is required."
+  echo "Set it like this:"
+  echo "GROQ_API_KEY=xxx PUBLIC_HOST=1.2.3.4 bash install.sh"
+  exit 1
+fi
+
 PI_PUBLIC_URL="http://${PUBLIC_HOST}"
 
-read -srp "GROQ_API_KEY: " GROQ_API_KEY
-echo
-read -srp "OPENROUTER_API_KEY (optional): " OPENROUTER_API_KEY
-echo
-read -srp "KIMI_API_KEY (optional): " KIMI_API_KEY
-echo
+log "Installing packages"
+aptx update
+aptx install -y --no-install-recommends python3-full python3-venv nginx rsync git curl
 
-echo
-echo "==> Installing packages"
-apt update
-apt install -y python3-full python3-venv nginx rsync git
-
-echo
-echo "==> Creating service user"
-id -u "$SERVICE_USER" >/dev/null 2>&1 || useradd --system --create-home --home-dir "$APP_DIR" --shell /usr/sbin/nologin "$SERVICE_USER"
+log "Creating service user"
+id -u "$SERVICE_USER" >/dev/null 2>&1 || \
+  useradd --system --create-home --home-dir "$APP_DIR" --shell /usr/sbin/nologin "$SERVICE_USER"
 
 mkdir -p "$APP_DIR"
 mkdir -p "$APP_DIR/sessions"
 
-echo
-echo "==> Syncing app files"
+log "Syncing app files"
 rsync -a --delete \
   --exclude '.git' \
   --exclude '.venv' \
@@ -61,29 +105,28 @@ rsync -a --delete \
 
 chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR"
 
-echo
-echo "==> Creating virtualenv and installing Python deps"
+log "Creating virtualenv and installing Python deps"
 runuser -u "$SERVICE_USER" -- bash -lc "
+set -Eeuo pipefail
 cd '$APP_DIR'
 python3 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
-python3 -m py_compile main.py agent.py cli.py db.py
+. .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+python -m py_compile main.py agent.py cli.py db.py
 "
 
-echo
-echo "==> Writing env file"
-cat > "$ENV_FILE" <<ENVEOF
-GROQ_API_KEY=${GROQ_API_KEY}
-OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-KIMI_API_KEY=${KIMI_API_KEY}
-PI_PUBLIC_URL=${PI_PUBLIC_URL}
-ENVEOF
+log "Writing env file"
+{
+  printf 'GROQ_API_KEY=%s\n' "$GROQ_API_KEY"
+  printf 'OPENROUTER_API_KEY=%s\n' "$OPENROUTER_API_KEY"
+  printf 'KIMI_API_KEY=%s\n' "$KIMI_API_KEY"
+  printf 'PI_PUBLIC_URL=%s\n' "$PI_PUBLIC_URL"
+} > "$ENV_FILE"
+
 chmod 600 "$ENV_FILE"
 
-echo
-echo "==> Writing systemd service"
+log "Writing systemd service"
 cat > "$SERVICE_FILE" <<'UNITEOF'
 [Unit]
 Description=PI Browser Agent
@@ -105,8 +148,7 @@ PrivateTmp=true
 WantedBy=multi-user.target
 UNITEOF
 
-echo
-echo "==> Writing nginx config"
+log "Writing nginx config"
 cat > "$NGINX_SITE" <<'NGINXEOF'
 server {
     listen 80;
@@ -155,9 +197,8 @@ NGINXEOF
 ln -sfn "$NGINX_SITE" "$NGINX_LINK"
 rm -f /etc/nginx/sites-enabled/default
 
-echo
-echo "==> Initializing aliases / sessions / global model"
-python3 - <<'PY'
+log "Initializing aliases / sessions / global model"
+"$APP_DIR/.venv/bin/python" - <<'PY'
 import json
 import secrets
 import shutil
@@ -203,19 +244,19 @@ PY
 
 chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR"
 
-echo
-echo "==> Starting services"
+log "Starting services"
 systemctl daemon-reload
-systemctl enable --now my-agent
-nginx -t
-systemctl enable --now nginx
-systemctl reload nginx
+systemctl enable my-agent
+systemctl restart my-agent
 
-echo
-echo "==> Health"
-curl -s http://127.0.0.1:8000/healthz || true
+nginx -t
+systemctl enable nginx
+systemctl restart nginx
+
+log "Health"
+curl -fsS http://127.0.0.1:8000/healthz || true
 echo
 echo "Install complete."
-echo "Public:  ${PI_PUBLIC_URL}/?-projects-pi-ru"
-echo "Backup:  ${PI_PUBLIC_URL}/?-projects-pi-ru/1"
-echo "Admin:   cat /opt/my-agent/session_aliases.json"
+echo "Public: ${PI_PUBLIC_URL}/?-projects-pi-ru"
+echo "Backup: ${PI_PUBLIC_URL}/?-projects-pi-ru/1"
+echo "Admin alias file: /opt/my-agent/session_aliases.json"
