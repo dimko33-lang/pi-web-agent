@@ -34,40 +34,78 @@ fi
 DEFAULT_IP="$(hostname -I | awk '{print $1}')"
 
 PUBLIC_HOST="${PUBLIC_HOST:-}"
-GROQ_API_KEY="${GROQ_API_KEY:-}"
 OPENROUTER_API_KEY="${OPENROUTER_API_KEY:-}"
+GROQ_API_KEY="${GROQ_API_KEY:-}"
+GEMINI_API_KEY="${GEMINI_API_KEY:-}"
+ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}"
+OPENAI_API_KEY="${OPENAI_API_KEY:-}"
 KIMI_API_KEY="${KIMI_API_KEY:-}"
 
-# Если есть нормальная консоль — можно спросить
+PROMPT_FD=""
+
 if [ -t 0 ]; then
-  if [ -z "$PUBLIC_HOST" ]; then
-    read -rp "Public host/IP [$DEFAULT_IP]: " PUBLIC_HOST
-    PUBLIC_HOST="${PUBLIC_HOST:-$DEFAULT_IP}"
-  fi
-
-  if [ -z "$GROQ_API_KEY" ]; then
-    read -srp "GROQ_API_KEY: " GROQ_API_KEY
-    echo
-  fi
-
-  if [ -z "$OPENROUTER_API_KEY" ]; then
-    read -srp "OPENROUTER_API_KEY (optional): " OPENROUTER_API_KEY
-    echo
-  fi
-
-  if [ -z "$KIMI_API_KEY" ]; then
-    read -srp "KIMI_API_KEY (optional): " KIMI_API_KEY
-    echo
-  fi
-else
-  # Если установка идет автоматом — не спрашиваем ничего
-  PUBLIC_HOST="${PUBLIC_HOST:-$DEFAULT_IP}"
+  PROMPT_FD=0
+elif [ -r /dev/tty ]; then
+  exec 3<>/dev/tty
+  PROMPT_FD=3
 fi
 
-if [ -z "$GROQ_API_KEY" ]; then
-  echo "GROQ_API_KEY is required."
-  echo "Set it like this:"
-  echo "GROQ_API_KEY=xxx PUBLIC_HOST=1.2.3.4 bash install.sh"
+prompt_text() {
+  local __var="$1"
+  local __label="$2"
+  local __default="${3:-}"
+  local __value=""
+
+  [ -z "$PROMPT_FD" ] && return 0
+
+  if [ -n "$__default" ]; then
+    printf "%s [%s]: " "$__label" "$__default" > /dev/tty
+  else
+    printf "%s: " "$__label" > /dev/tty
+  fi
+
+  IFS= read -r -u "$PROMPT_FD" __value || true
+  [ -z "$__value" ] && __value="$__default"
+  printf -v "$__var" '%s' "$__value"
+}
+
+prompt_key_visible() {
+  local __var="$1"
+  local __label="$2"
+  local __value=""
+
+  [ -z "$PROMPT_FD" ] && return 0
+
+  printf "%s (press Enter to skip): " "$__label" > /dev/tty
+  IFS= read -r -u "$PROMPT_FD" __value || true
+  printf -v "$__var" '%s' "$__value"
+}
+
+if [ -z "$PUBLIC_HOST" ]; then
+  prompt_text PUBLIC_HOST "Public host/IP" "$DEFAULT_IP"
+fi
+PUBLIC_HOST="${PUBLIC_HOST:-$DEFAULT_IP}"
+
+if [ -n "$PROMPT_FD" ]; then
+  printf "\nYou can paste keys directly into the terminal.\n" > /dev/tty
+  printf "If you do not have a key for a provider, just press Enter.\n" > /dev/tty
+  printf "Current built-in providers in the app: OpenRouter, GROQ, Kimi.\n" > /dev/tty
+  printf "Extra keys can also be stored now for future use: Gemini, Anthropic, OpenAI.\n\n" > /dev/tty
+fi
+
+[ -z "$OPENROUTER_API_KEY" ] && prompt_key_visible OPENROUTER_API_KEY "OPENROUTER_API_KEY"
+[ -z "$GROQ_API_KEY" ] && prompt_key_visible GROQ_API_KEY "GROQ_API_KEY"
+[ -z "$GEMINI_API_KEY" ] && prompt_key_visible GEMINI_API_KEY "GEMINI_API_KEY"
+[ -z "$ANTHROPIC_API_KEY" ] && prompt_key_visible ANTHROPIC_API_KEY "ANTHROPIC_API_KEY"
+[ -z "$OPENAI_API_KEY" ] && prompt_key_visible OPENAI_API_KEY "OPENAI_API_KEY"
+[ -z "$KIMI_API_KEY" ] && prompt_key_visible KIMI_API_KEY "KIMI_API_KEY"
+
+if [ -z "${OPENROUTER_API_KEY}${GROQ_API_KEY}${KIMI_API_KEY}" ]; then
+  echo "At least one currently supported key is required:"
+  echo "OPENROUTER_API_KEY, GROQ_API_KEY, or KIMI_API_KEY."
+  echo
+  echo "Gemini / Anthropic / OpenAI keys can be stored now,"
+  echo "but they are not enough by themselves for the current app version."
   exit 1
 fi
 
@@ -118,8 +156,11 @@ python -m py_compile main.py agent.py cli.py db.py
 
 log "Writing env file"
 {
-  printf 'GROQ_API_KEY=%s\n' "$GROQ_API_KEY"
   printf 'OPENROUTER_API_KEY=%s\n' "$OPENROUTER_API_KEY"
+  printf 'GROQ_API_KEY=%s\n' "$GROQ_API_KEY"
+  printf 'GEMINI_API_KEY=%s\n' "$GEMINI_API_KEY"
+  printf 'ANTHROPIC_API_KEY=%s\n' "$ANTHROPIC_API_KEY"
+  printf 'OPENAI_API_KEY=%s\n' "$OPENAI_API_KEY"
   printf 'KIMI_API_KEY=%s\n' "$KIMI_API_KEY"
   printf 'PI_PUBLIC_URL=%s\n' "$PI_PUBLIC_URL"
 } > "$ENV_FILE"
@@ -260,3 +301,9 @@ echo "Install complete."
 echo "Public: ${PI_PUBLIC_URL}/?-projects-pi-ru"
 echo "Backup: ${PI_PUBLIC_URL}/?-projects-pi-ru/1"
 echo "Admin alias file: /opt/my-agent/session_aliases.json"
+
+if [ -z "$GROQ_API_KEY" ]; then
+  echo
+  echo "Note: initial default session is still created with GROQ."
+  echo "If you did not enter a GROQ key, open the web UI and switch provider/model there."
+fi
