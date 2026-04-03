@@ -9,9 +9,8 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
-# Ждём, пока освободится dpkg (если висит unattended-upgrades)
 while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
-  echo "Waiting for dpkg lock (unattended-upgrades)..."
+  echo "Waiting for dpkg lock..."
   sleep 2
 done
 
@@ -21,11 +20,15 @@ apt install -y git
 rm -rf "$WORKDIR"
 git clone "$REPO_URL" "$WORKDIR"
 
-cd "$WORKDIR"
-if [ -f install.sh ]; then
-  chmod +x install.sh
-  bash install.sh
-else
+if ! cd "$WORKDIR"; then
+  echo "ERROR: Can't cd to $WORKDIR"
+  exit 1
+fi
+
+if [ ! -f install.sh ]; then
   echo "ERROR: install.sh not found in $WORKDIR"
   exit 1
 fi
+
+chmod +x install.sh
+exec bash install.sh
