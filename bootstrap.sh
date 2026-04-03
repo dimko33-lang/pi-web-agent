@@ -1,4 +1,3 @@
-
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
@@ -17,4 +16,10 @@ rm -rf "$WORKDIR"
 git clone "$REPO_URL" "$WORKDIR"
 
 cd "$WORKDIR"
-bash install.sh
+if [ -f install.sh ]; then
+  chmod +x install.sh
+  bash install.sh
+else
+  echo "ERROR: install.sh not found in $WORKDIR"
+  exit 1
+fi
