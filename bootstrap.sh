@@ -9,6 +9,12 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
+# Ждём, пока освободится dpkg (если висит unattended-upgrades)
+while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+  echo "Waiting for dpkg lock (unattended-upgrades)..."
+  sleep 2
+done
+
 apt update
 apt install -y git
 
