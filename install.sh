@@ -92,11 +92,7 @@ fi
 [ -z "$KIMI_API_KEY" ] && prompt_key_visible KIMI_API_KEY "KIMI_API_KEY"
 
 if [ -z "${OPENROUTER_API_KEY}${GROQ_API_KEY}${KIMI_API_KEY}" ]; then
-  echo "At least one currently supported key is required:"
-  echo "OPENROUTER_API_KEY, GROQ_API_KEY, or KIMI_API_KEY."
-  echo
-  echo "Gemini / Anthropic / OpenAI keys can be stored now,"
-  echo "but they are not enough by themselves for the current app version."
+  echo "At least one currently supported key is required: OPENROUTER_API_KEY, GROQ_API_KEY, or KIMI_API_KEY."
   exit 1
 fi
 
@@ -107,10 +103,8 @@ aptx update
 aptx install -y --no-install-recommends python3-full python3-venv nginx rsync git curl
 
 log "Creating service user"
-id -u "$SERVICE_USER" >/dev/null 2>&1 || \
-  useradd --system --create-home --home-dir "$APP_DIR" --shell /usr/sbin/nologin "$SERVICE_USER"
-mkdir -p "$APP_DIR"
-mkdir -p "$APP_DIR/sessions"
+id -u "$SERVICE_USER" >/dev/null 2>&1 || useradd --system --create-home --home-dir "$APP_DIR" --shell /usr/sbin/nologin "$SERVICE_USER"
+mkdir -p "$APP_DIR" "$APP_DIR/sessions"
 
 log "Syncing app files"
 rsync -a --delete \
@@ -182,9 +176,7 @@ server {
     listen 80;
     server_name _;
     location = / {
-        if ($query_string = "") {
-            return 404;
-        }
+        if ($query_string = "") { return 404; }
         proxy_pass http://127.0.0.1:8000;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -229,4 +221,56 @@ from db import init_db, get_or_create_session, update_session_state, session_htm
 APP = Path("/opt/my-agent")
 ALIAS_FILE = APP / "session_aliases.json"
 GLOBAL_FILE = APP / "global_model.json"
-TEMPLATE = APP / "
+TEMPLATE = APP / "default_terminal.html"
+
+aliases = {
+    "admin": "private",
+    "default": "default",
+    "slot1": "slot1",
+    "slot2": "slot2"
+}
+
+ALIAS_FILE.write_text(json.dumps(aliases, ensure_ascii=False, indent=2), encoding="utf-8")
+GLOBAL_FILE.write_text(json.dumps({"provider": "groq", "model": "llama-3.1-8b-instant"}, ensure_ascii=False, indent=2), encoding="utf-8")
+
+init_db()
+for name in ["default", "slot1", "slot2", "slot3", "slot4", "slot5", "private"]:
+    s = get_or_create_session(name, provider="groq", model="llama-3.1-8b-instant")
+    update_session_state(s["id"], "groq", "llama-3.1-8b-instant")
+    shutil.copy2(TEMPLATE, session_html_path(s["id"]))
+PY
+
+chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR"
+
+log "Starting services"
+systemctl daemon-reload
+systemctl enable my-agent
+systemctl restart my-agent
+
+nginx -t
+systemctl enable nginx
+systemctl restart nginx
+
+log "Health"
+curl -fsS http://127.0.0.1:8000/healthz || true
+
+echo
+echo "Installation completed."
+echo
+echo "Admin panel:"
+echo "   ${PI_PUBLIC_URL}/?admin"
+echo
+echo "Client panels:"
+echo "   ${PI_PUBLIC_URL}/?default"
+echo "   ${PI_PUBLIC_URL}/?slot1"
+echo "   ${PI_PUBLIC_URL}/?slot2"
+echo
+echo "More client panels: edit /opt/my-agent/session_aliases.json then run: systemctl restart my-agent"
+echo
+echo "Helpful commands:"
+echo "   systemctl status my-agent"
+echo "   journalctl -u my-agent -f"
+echo "   cd /opt/my-agent"
+echo
+echo "Done."
+echo
