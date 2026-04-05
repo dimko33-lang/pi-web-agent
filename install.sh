@@ -307,3 +307,53 @@ if [ -z "$GROQ_API_KEY" ]; then
   echo "Note: initial default session is still created with GROQ."
   echo "If you did not enter a GROQ key, open the web UI and switch provider/model there."
 fi
+echo
+echo "Installation completed."
+echo
+
+python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+
+base_url = os.environ.get("PI_PUBLIC_URL", "").rstrip("/")
+alias_file = Path("/opt/my-agent/session_aliases.json")
+
+if not alias_file.exists():
+    print("Alias file not found:")
+    print("   /opt/my-agent/session_aliases.json")
+    print()
+    print("Done.")
+    raise SystemExit(0)
+
+data = json.loads(alias_file.read_text(encoding="utf-8"))
+
+admin_alias = None
+other_aliases = []
+
+for alias, target in data.items():
+    if target == "private" and admin_alias is None:
+        admin_alias = alias
+    else:
+        other_aliases.append(alias)
+
+if admin_alias:
+    print("Admin panel:")
+    print(f"   {base_url}/?{admin_alias}")
+    print()
+
+if other_aliases:
+    print("Client panels:")
+    for alias in other_aliases:
+        print(f"   {base_url}/?{alias}")
+    print()
+
+print("Helpful commands:")
+print("   systemctl status my-agent")
+print("   journalctl -u my-agent -f")
+print("   cd /opt/my-agent")
+print()
+print("Done.")
+PY
+
+echo
