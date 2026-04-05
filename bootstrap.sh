@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 trap 'echo "ERROR: line $LINENO: $BASH_COMMAND" >&2' ERR
+
 export DEBIAN_FRONTEND=noninteractive
 
 REPO_URL="${REPO_URL:-https://github.com/dimko33-lang/pi-web-agent.git}"
@@ -35,11 +36,13 @@ rm -rf "$WORKDIR"
 git clone --depth 1 --branch "$REPO_REF" "$REPO_URL" "$WORKDIR"
 
 cd "$WORKDIR"
+
 if [ ! -f install.sh ]; then
   echo "install.sh not found"
   exit 1
 fi
 
 chmod +x install.sh
+
 log "Running install.sh"
 ./install.sh

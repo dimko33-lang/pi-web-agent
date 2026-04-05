@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 trap 'echo "ERROR: line $LINENO: $BASH_COMMAND" >&2' ERR
+
 export DEBIAN_FRONTEND=noninteractive
+
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_DIR="/opt/my-agent"
 SERVICE_USER="my-agent"
@@ -30,6 +32,7 @@ if ! command -v systemctl >/dev/null 2>&1; then
 fi
 
 DEFAULT_IP="$(hostname -I | awk '{print $1}')"
+
 PUBLIC_HOST="${PUBLIC_HOST:-}"
 OPENROUTER_API_KEY="${OPENROUTER_API_KEY:-}"
 GROQ_API_KEY="${GROQ_API_KEY:-}"
@@ -39,6 +42,7 @@ OPENAI_API_KEY="${OPENAI_API_KEY:-}"
 KIMI_API_KEY="${KIMI_API_KEY:-}"
 
 PROMPT_FD=""
+
 if [ -t 0 ]; then
   PROMPT_FD=0
 elif [ -r /dev/tty ]; then
@@ -51,12 +55,15 @@ prompt_text() {
   local __label="$2"
   local __default="${3:-}"
   local __value=""
+
   [ -z "$PROMPT_FD" ] && return 0
+
   if [ -n "$__default" ]; then
     printf "%s [%s]: " "$__label" "$__default" > /dev/tty
   else
     printf "%s: " "$__label" > /dev/tty
   fi
+
   IFS= read -r -u "$PROMPT_FD" __value || true
   [ -z "$__value" ] && __value="$__default"
   printf -v "$__var" '%s' "$__value"
@@ -66,7 +73,9 @@ prompt_key_visible() {
   local __var="$1"
   local __label="$2"
   local __value=""
+
   [ -z "$PROMPT_FD" ] && return 0
+
   printf "%s (press Enter to skip): " "$__label" > /dev/tty
   IFS= read -r -u "$PROMPT_FD" __value || true
   printf -v "$__var" '%s' "$__value"
@@ -92,7 +101,11 @@ fi
 [ -z "$KIMI_API_KEY" ] && prompt_key_visible KIMI_API_KEY "KIMI_API_KEY"
 
 if [ -z "${OPENROUTER_API_KEY}${GROQ_API_KEY}${KIMI_API_KEY}" ]; then
-  echo "At least one currently supported key is required: OPENROUTER_API_KEY, GROQ_API_KEY, or KIMI_API_KEY."
+  echo "At least one currently supported key is required:"
+  echo "OPENROUTER_API_KEY, GROQ_API_KEY, or KIMI_API_KEY."
+  echo
+  echo "Gemini / Anthropic / OpenAI keys can be stored now,"
+  echo "but they are not enough by themselves for the current app version."
   exit 1
 fi
 
@@ -103,8 +116,11 @@ aptx update
 aptx install -y --no-install-recommends python3-full python3-venv nginx rsync git curl
 
 log "Creating service user"
-id -u "$SERVICE_USER" >/dev/null 2>&1 || useradd --system --create-home --home-dir "$APP_DIR" --shell /usr/sbin/nologin "$SERVICE_USER"
-mkdir -p "$APP_DIR" "$APP_DIR/sessions"
+id -u "$SERVICE_USER" >/dev/null 2>&1 || \
+  useradd --system --create-home --home-dir "$APP_DIR" --shell /usr/sbin/nologin "$SERVICE_USER"
+
+mkdir -p "$APP_DIR"
+mkdir -p "$APP_DIR/sessions"
 
 log "Syncing app files"
 rsync -a --delete \
@@ -148,6 +164,7 @@ log "Writing env file"
   printf 'KIMI_API_KEY=%s\n' "$KIMI_API_KEY"
   printf 'PI_PUBLIC_URL=%s\n' "$PI_PUBLIC_URL"
 } > "$ENV_FILE"
+
 chmod 600 "$ENV_FILE"
 
 log "Writing systemd service"
@@ -155,6 +172,7 @@ cat > "$SERVICE_FILE" <<'UNITEOF'
 [Unit]
 Description=PI Browser Agent
 After=network.target
+
 [Service]
 Type=simple
 User=my-agent
@@ -166,6 +184,7 @@ Restart=on-failure
 RestartSec=2
 NoNewPrivileges=true
 PrivateTmp=true
+
 [Install]
 WantedBy=multi-user.target
 UNITEOF
@@ -175,15 +194,21 @@ cat > "$NGINX_SITE" <<'NGINXEOF'
 server {
     listen 80;
     server_name _;
+
     location = / {
-        if ($query_string = "") { return 404; }
+        if ($query_string = "") {
+            return 404;
+        }
+
         proxy_pass http://127.0.0.1:8000;
         proxy_http_version 1.1;
+
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
+
     location /events {
         proxy_pass http://127.0.0.1:8000/events;
         proxy_http_version 1.1;
@@ -191,14 +216,17 @@ server {
         proxy_buffering off;
         proxy_cache off;
         proxy_read_timeout 1h;
+
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
+
     location / {
         proxy_pass http://127.0.0.1:8000;
         proxy_http_version 1.1;
+
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -217,8 +245,10 @@ import secrets
 import shutil
 import sys
 from pathlib import Path
+
 sys.path.insert(0, "/opt/my-agent")
 from db import init_db, get_or_create_session, update_session_state, session_html_path
+
 APP = Path("/opt/my-agent")
 ALIAS_FILE = APP / "session_aliases.json"
 GLOBAL_FILE = APP / "global_model.json"
@@ -238,9 +268,13 @@ aliases = {
 }
 
 ALIAS_FILE.write_text(json.dumps(aliases, ensure_ascii=False, indent=2), encoding="utf-8")
-GLOBAL_FILE.write_text(json.dumps({"provider": "groq", "model": "llama-3.1-8b-instant"}, ensure_ascii=False, indent=2), encoding="utf-8")
+GLOBAL_FILE.write_text(json.dumps({
+    "provider": "groq",
+    "model": "llama-3.1-8b-instant"
+}, ensure_ascii=False, indent=2), encoding="utf-8")
 
 init_db()
+
 for name in ["default", "slot1", "slot2", "slot3", "slot4", "slot5", "private"]:
     s = get_or_create_session(name, provider="groq", model="llama-3.1-8b-instant")
     update_session_state(s["id"], "groq", "llama-3.1-8b-instant")
@@ -262,17 +296,14 @@ systemctl restart nginx
 
 log "Health"
 curl -fsS http://127.0.0.1:8000/healthz || true
+echo
+echo "Install complete."
+echo "Public: ${PI_PUBLIC_URL}/?-projects-pi-ru"
+echo "Backup: ${PI_PUBLIC_URL}/?-projects-pi-ru/1"
+echo "Admin alias file: /opt/my-agent/session_aliases.json"
 
-echo
-echo "Installation completed."
-echo
-echo "Admin panel:"
-echo "   ${PI_PUBLIC_URL}/?${ADMIN_ALIAS}"
-echo
-echo "Client panels:"
-echo "   ${PI_PUBLIC_URL}/?${base}"
-echo "   ${PI_PUBLIC_URL}/?${base}/1"
-echo "   ${PI_PUBLIC_URL}/?${base}/2"
-echo
-echo "Done."
-echo
+if [ -z "$GROQ_API_KEY" ]; then
+  echo
+  echo "Note: initial default session is still created with GROQ."
+  echo "If you did not enter a GROQ key, open the web UI and switch provider/model there."
+fi
