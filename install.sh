@@ -296,22 +296,12 @@ systemctl restart nginx
 
 log "Health"
 curl -fsS http://127.0.0.1:8000/healthz || true
-echo
-echo "Install complete."
-echo "Public: ${PI_PUBLIC_URL}/?-projects-pi-ru"
-echo "Backup: ${PI_PUBLIC_URL}/?-projects-pi-ru/1"
-echo "Admin alias file: /opt/my-agent/session_aliases.json"
 
-if [ -z "$GROQ_API_KEY" ]; then
-  echo
-  echo "Note: initial default session is still created with GROQ."
-  echo "If you did not enter a GROQ key, open the web UI and switch provider/model there."
-fi
 echo
 echo "Installation completed."
 echo
 
-python3 - <<'PY'
+PI_PUBLIC_URL="$PI_PUBLIC_URL" python3 - <<'PY'
 import json
 import os
 from pathlib import Path
@@ -329,22 +319,22 @@ if not alias_file.exists():
 data = json.loads(alias_file.read_text(encoding="utf-8"))
 
 admin_alias = None
-other_aliases = []
+client_aliases = []
 
 for alias, target in data.items():
     if target == "private" and admin_alias is None:
         admin_alias = alias
     else:
-        other_aliases.append(alias)
+        client_aliases.append(alias)
 
 if admin_alias:
     print("Admin panel:")
     print(f"   {base_url}/?{admin_alias}")
     print()
 
-if other_aliases:
+if client_aliases:
     print("Client panels:")
-    for alias in other_aliases:
+    for alias in client_aliases[:3]:
         print(f"   {base_url}/?{alias}")
     print()
 
