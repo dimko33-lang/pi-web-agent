@@ -213,6 +213,7 @@ rm -f /etc/nginx/sites-enabled/default
 log "Initializing aliases / sessions / global model"
 "$APP_DIR/.venv/bin/python" - <<'PY'
 import json
+import secrets
 import shutil
 import sys
 from pathlib import Path
@@ -223,11 +224,17 @@ ALIAS_FILE = APP / "session_aliases.json"
 GLOBAL_FILE = APP / "global_model.json"
 TEMPLATE = APP / "default_terminal.html"
 
+base = "-projects-pi-ru"
+admin_alias = f"{base}-admin-{secrets.token_hex(6)}"
+
 aliases = {
-    "admin": "private",
-    "default": "default",
-    "slot1": "slot1",
-    "slot2": "slot2"
+    base: "default",
+    f"{base}/1": "slot1",
+    f"{base}/2": "slot2",
+    f"{base}/3": "slot3",
+    f"{base}/4": "slot4",
+    f"{base}/5": "slot5",
+    admin_alias: "private",
 }
 
 ALIAS_FILE.write_text(json.dumps(aliases, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -238,6 +245,8 @@ for name in ["default", "slot1", "slot2", "slot3", "slot4", "slot5", "private"]:
     s = get_or_create_session(name, provider="groq", model="llama-3.1-8b-instant")
     update_session_state(s["id"], "groq", "llama-3.1-8b-instant")
     shutil.copy2(TEMPLATE, session_html_path(s["id"]))
+
+print("ADMIN_ALIAS=" + admin_alias)
 PY
 
 chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR"
@@ -258,19 +267,12 @@ echo
 echo "Installation completed."
 echo
 echo "Admin panel:"
-echo "   ${PI_PUBLIC_URL}/?admin"
+echo "   ${PI_PUBLIC_URL}/?${ADMIN_ALIAS}"
 echo
 echo "Client panels:"
-echo "   ${PI_PUBLIC_URL}/?default"
-echo "   ${PI_PUBLIC_URL}/?slot1"
-echo "   ${PI_PUBLIC_URL}/?slot2"
-echo
-echo "More client panels: edit /opt/my-agent/session_aliases.json then run: systemctl restart my-agent"
-echo
-echo "Helpful commands:"
-echo "   systemctl status my-agent"
-echo "   journalctl -u my-agent -f"
-echo "   cd /opt/my-agent"
+echo "   ${PI_PUBLIC_URL}/?${base}"
+echo "   ${PI_PUBLIC_URL}/?${base}/1"
+echo "   ${PI_PUBLIC_URL}/?${base}/2"
 echo
 echo "Done."
 echo
