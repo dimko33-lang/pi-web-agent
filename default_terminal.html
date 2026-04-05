@@ -338,10 +338,23 @@ let currentModel = {
 };
 let models = [];
 let poller = null;
+let thinkingTimer = null;
 
 function setThinking(v) {
   sendLabel.classList.toggle('thinking', !!v);
-  sendLabel.textContent = v ? '...' : 'Send';
+
+  if (thinkingTimer) {
+    clearTimeout(thinkingTimer);
+    thinkingTimer = null;
+  }
+
+  sendLabel.textContent = v ? 'Waiting...' : 'Send';
+
+  if (v) {
+    thinkingTimer = setTimeout(() => {
+      sendLabel.textContent = 'Still working...';
+    }, 3500);
+  }
 }
 
 function api(method, url, data=null, admin=false) {
@@ -353,10 +366,43 @@ function api(method, url, data=null, admin=false) {
     headers,
     body: data ? JSON.stringify(data) : null
   }).then(async (res) => {
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(payload.error || ('HTTP ' + res.status));
-    return payload;
+    let payload = null;
+    const contentType = res.headers.get('content-type') || '';
+
+    if (contentType.includes('application/json')) {
+      payload = await res.json().catch(() => null);
+    } else {
+      const txt = await res.text().catch(() => '');
+      payload = txt ? { error: txt } : {};
+    }
+
+    if (!res.ok) {
+      throw new Error(
+        (payload && (payload.error || payload.message)) || ('HTTP ' + res.status)
+      );
+    }
+
+    return payload || {};
   });
+}
+
+function showRuntimeError(text) {
+  const wrap = document.createElement('div');
+  wrap.className = 'msgWrap';
+
+  const msg = document.createElement('div');
+  msg.className = 'msg assistant';
+  msg.style.border = '1px solid rgba(255, 90, 90, 0.28)';
+  msg.style.background = 'rgba(120, 20, 20, 0.18)';
+  msg.style.color = '#ffd6d6';
+  msg.style.padding = '6px 8px';
+  msg.style.borderRadius = '8px';
+  msg.style.letterSpacing = '1.1px';
+  msg.textContent = text;
+
+  wrap.appendChild(msg);
+  chatDiv.appendChild(wrap);
+  chatDiv.scrollTop = chatDiv.scrollHeight;
 }
 
 function autoResize() {
@@ -387,6 +433,7 @@ function renderHistory(items) {
           await loadHistory();
         } catch (e) {
           console.error(e);
+          showRuntimeError('Delete failed: ' + (e?.message || 'Unknown error'));
         }
       };
     }
@@ -430,6 +477,7 @@ function renderModelDock() {
         modelDropdown.style.display = 'none';
       } catch (e2) {
         console.error(e2);
+        showRuntimeError('Model switch failed: ' + (e2?.message || 'Unknown error'));
       }
     };
     modelDropdown.appendChild(el);
@@ -531,6 +579,7 @@ async function sendMessage() {
     }
   } catch (e) {
     console.error(e);
+    showRuntimeError('Error: ' + (e?.message || 'Unknown error'));
   } finally {
     setThinking(false);
   }
@@ -569,6 +618,7 @@ undoBtn.onclick = async () => {
     location.reload();
   } catch (e) {
     console.error(e);
+    showRuntimeError('Undo failed: ' + (e?.message || 'Unknown error'));
   }
 };
 
@@ -578,6 +628,7 @@ clearBtn.onclick = async () => {
     await loadHistory();
   } catch (e) {
     console.error(e);
+    showRuntimeError('Clear failed: ' + (e?.message || 'Unknown error'));
   }
 };
 
@@ -587,6 +638,7 @@ clearAllBtn.onclick = async () => {
     await loadHistory();
   } catch (e) {
     console.error(e);
+    showRuntimeError('Clear all failed: ' + (e?.message || 'Unknown error'));
   }
 };
 
@@ -621,6 +673,7 @@ fsZone.addEventListener('click', () => {
   } catch (e) {
     console.error(e);
     chatDiv.innerHTML = '';
+    showRuntimeError('Initialization failed: ' + (e?.message || 'Unknown error'));
   }
 })();
 </script>
