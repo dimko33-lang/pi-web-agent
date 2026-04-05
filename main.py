@@ -52,25 +52,23 @@ def raw_query_alias():
 
 
 def not_found_html():
-    return """<!DOCTYPE html>
-<html lang="ru">
+    return """<!doctype html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Not found</title>
-<style>
-body{margin:0;min-height:100vh;display:grid;place-items:center;background:rgb(20,40,76);color:#fff;font-family:Arial,sans-serif}
-.card{width:min(720px,calc(100% - 32px));padding:24px;border-radius:16px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14)}
-code{background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:6px}
-</style>
+  <meta charset="utf-8">
+  <title>404</title>
+  <style>
+    html,body{height:100%;margin:0}
+    body{
+      display:grid;
+      place-items:center;
+      background:#111;
+      color:#999;
+      font:14px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;
+    }
+  </style>
 </head>
-<body>
-  <div class="card">
-    <h1>Not found</h1>
-    <p>Открывай только заранее созданный alias.</p>
-    <p>Например: <code>?-projects-pi-ru</code></p>
-  </div>
-</body>
+<body>404</body>
 </html>"""
 
 
