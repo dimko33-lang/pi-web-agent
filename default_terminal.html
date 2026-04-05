@@ -386,23 +386,61 @@ function api(method, url, data=null, admin=false) {
   });
 }
 
+function formatRuntimeError(raw) {
+  const msg = String(raw || '').trim();
+  const low = msg.toLowerCase();
+
+  if (!msg) return 'Unknown error';
+  if (low.includes('api key') || low.includes('invalid api key') || low.includes('unauthorized') || low.includes('401')) {
+    return 'Provider key error';
+  }
+  if (low.includes('rate limit') || low.includes('429')) {
+    return 'Rate limit';
+  }
+  if (low.includes('timeout') || low.includes('timed out') || low.includes('504')) {
+    return 'Provider timeout';
+  }
+  if (low.includes('model') && (low.includes('not found') || low.includes('404') || low.includes('does not exist'))) {
+    return 'Model unavailable';
+  }
+  if (low.includes('json')) {
+    return 'Response parse error';
+  }
+  if (low.includes('html')) {
+    return 'HTML update error';
+  }
+  if (msg.length > 120) {
+    return msg.slice(0, 120) + '…';
+  }
+  return msg;
+}
+
 function showRuntimeError(text) {
+  document.querySelectorAll('.runtimeErrorLine').forEach(el => el.remove());
+
   const wrap = document.createElement('div');
-  wrap.className = 'msgWrap';
+  wrap.className = 'msgWrap runtimeErrorLine';
 
   const msg = document.createElement('div');
   msg.className = 'msg assistant';
-  msg.style.border = '1px solid rgba(255, 90, 90, 0.28)';
-  msg.style.background = 'rgba(120, 20, 20, 0.18)';
-  msg.style.color = '#ffd6d6';
-  msg.style.padding = '6px 8px';
-  msg.style.borderRadius = '8px';
-  msg.style.letterSpacing = '1.1px';
-  msg.textContent = text;
+  msg.style.color = 'rgba(255,190,190,0.88)';
+  msg.style.opacity = '0.9';
+  msg.style.fontSize = '11px';
+  msg.style.letterSpacing = '0.8px';
+  msg.style.padding = '2px 0';
+  msg.style.marginTop = '4px';
+  msg.style.background = 'transparent';
+  msg.style.border = 'none';
+  msg.style.borderRadius = '0';
+  msg.textContent = '[ ' + formatRuntimeError(text) + ' ]';
 
   wrap.appendChild(msg);
   chatDiv.appendChild(wrap);
   chatDiv.scrollTop = chatDiv.scrollHeight;
+
+  setTimeout(() => {
+    if (wrap.parentNode) wrap.style.opacity = '0.55';
+  }, 3500);
 }
 
 function autoResize() {
@@ -411,8 +449,12 @@ function autoResize() {
 }
 
 function renderHistory(items) {
+  const existingError = document.querySelector('.runtimeErrorLine');
   chatDiv.innerHTML = '';
-  if (!items || !items.length) return;
+  if (!items || !items.length) {
+    if (existingError) chatDiv.appendChild(existingError);
+    return;
+  }
 
   for (const item of items) {
     const wrap = document.createElement('div');
@@ -433,7 +475,7 @@ function renderHistory(items) {
           await loadHistory();
         } catch (e) {
           console.error(e);
-          showRuntimeError('Delete failed: ' + (e?.message || 'Unknown error'));
+          showRuntimeError(e?.message || 'Delete failed');
         }
       };
     }
@@ -441,6 +483,7 @@ function renderHistory(items) {
     chatDiv.appendChild(wrap);
   }
 
+  if (existingError) chatDiv.appendChild(existingError);
   chatDiv.scrollTop = chatDiv.scrollHeight;
 }
 
@@ -477,7 +520,7 @@ function renderModelDock() {
         modelDropdown.style.display = 'none';
       } catch (e2) {
         console.error(e2);
-        showRuntimeError('Model switch failed: ' + (e2?.message || 'Unknown error'));
+        showRuntimeError(e2?.message || 'Model switch failed');
       }
     };
     modelDropdown.appendChild(el);
@@ -579,7 +622,7 @@ async function sendMessage() {
     }
   } catch (e) {
     console.error(e);
-    showRuntimeError('Error: ' + (e?.message || 'Unknown error'));
+    showRuntimeError(e?.message || 'Unknown error');
   } finally {
     setThinking(false);
   }
@@ -618,7 +661,7 @@ undoBtn.onclick = async () => {
     location.reload();
   } catch (e) {
     console.error(e);
-    showRuntimeError('Undo failed: ' + (e?.message || 'Unknown error'));
+    showRuntimeError(e?.message || 'Undo failed');
   }
 };
 
@@ -628,7 +671,7 @@ clearBtn.onclick = async () => {
     await loadHistory();
   } catch (e) {
     console.error(e);
-    showRuntimeError('Clear failed: ' + (e?.message || 'Unknown error'));
+    showRuntimeError(e?.message || 'Clear failed');
   }
 };
 
@@ -638,7 +681,7 @@ clearAllBtn.onclick = async () => {
     await loadHistory();
   } catch (e) {
     console.error(e);
-    showRuntimeError('Clear all failed: ' + (e?.message || 'Unknown error'));
+    showRuntimeError(e?.message || 'Clear all failed');
   }
 };
 
@@ -673,7 +716,7 @@ fsZone.addEventListener('click', () => {
   } catch (e) {
     console.error(e);
     chatDiv.innerHTML = '';
-    showRuntimeError('Initialization failed: ' + (e?.message || 'Unknown error'));
+    showRuntimeError(e?.message || 'Initialization failed');
   }
 })();
 </script>
