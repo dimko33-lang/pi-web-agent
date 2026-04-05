@@ -342,6 +342,7 @@ print("Helpful commands:")
 print("   systemctl status my-agent")
 print("   journalctl -u my-agent -f")
 print("   cd /opt/my-agent")
+print("   cat /opt/my-agent/session_aliases.json")
 print()
 print("Done.")
 PY
