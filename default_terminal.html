@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-<title>pi-web</title>
+<title>~/projects/pi-ru</title>
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,300;1,400&display=swap');
@@ -74,8 +74,8 @@ body{
     line-height:22px;
     height:24px;
     letter-spacing:0.9px;
-    backdrop-filter:blur(10px);
-    -webkit-backdrop-filter:blur(10px);
+    backdrop-filter:blur(4px);
+    -webkit-backdrop-filter:blur(4px);
     transition:all 0.2s;
     vertical-align: middle;
     margin:0;
@@ -84,6 +84,8 @@ body{
 #adminControls select{
     min-width:130px;
     text-align:center;
+    background:rgba(255,255,255,0.08);
+    backdrop-filter:blur(4px);
 }
 #adminControls select:hover,
 #adminControls button:hover{
@@ -189,7 +191,7 @@ body{
 <div id="sendLabel">Send</div>
 
 <div id="bottomBar">
-  <div id="pathDisplay">pi-web</div>
+  <div id="pathDisplay">~/projects/pi-ru</div>
   <div id="adminControls">
     <select id="sessionSelect"></select>
     <button id="undoBtn" type="button">undo</button>
@@ -357,7 +359,7 @@ async function loadModels() {
 async function loadPublic() {
   adminMode = false;
   adminControls.style.display = 'none';
-  pathDisplay.textContent = 'pi-web';
+  pathDisplay.textContent = '~/projects/pi-ru';
   await syncGlobalModel();
   await loadHistory();
 }
@@ -365,7 +367,7 @@ async function loadPublic() {
 async function loadAdmin() {
   adminMode = true;
   adminControls.style.display = 'flex';
-  pathDisplay.textContent = 'pi-web';
+  pathDisplay.textContent = '~/projects/pi-ru';
 
   const state = await api('GET', '/admin/state', null, true);
   await loadModels();
