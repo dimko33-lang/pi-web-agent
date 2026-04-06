@@ -64,7 +64,7 @@ class Agent:
         self.default_openrouter_model = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o").strip()
         self.default_kimi_model = os.getenv("KIMI_MODEL", "kimi-k2.5").strip()
 
-        self.timeout = 180
+        self.timeout = 300  # увеличен до 5 минут
 
     def default_model_for(self, provider: str) -> str:
         if provider == "openrouter":
@@ -81,9 +81,7 @@ class Agent:
             return self.GROQ_LABELS.get(model, model)
 
         if provider == "openrouter":
-            for name, mid in self.OPENROUTER_FAVORITES:
-                if mid == model:
-                    return name
+            # для красоты можно вернуть красивое имя, но оставим model
             return model
 
         if provider == "kimi":
@@ -138,36 +136,35 @@ class Agent:
         return out
 
     def _openrouter_models(self):
+        """
+        Возвращает ВСЕ модели, которые доступны через OpenRouter API.
+        Без фильтрации по избранному.
+        """
         out = []
-        available = set()
-
         try:
-            r = requests.get(
-                "https://openrouter.ai/api/v1/models",
-                timeout=20,
-            )
+            r = requests.get("https://openrouter.ai/api/v1/models", timeout=30)
             r.raise_for_status()
             data = r.json()
-            available = {item["id"] for item in data.get("data", []) if item.get("id")}
+            for item in data.get("data", []):
+                model_id = item.get("id")
+                if model_id:
+                    # Берём красивое имя, если есть
+                    display_name = item.get("name") or model_id
+                    out.append({
+                        "name": display_name,
+                        "provider": "openrouter",
+                        "model": model_id,
+                    })
+            # Сортируем по имени для удобства
+            out.sort(key=lambda x: x["name"].lower())
         except Exception:
-            available = {mid for _, mid in self.OPENROUTER_FAVORITES}
-
-        for name, model_id in self.OPENROUTER_FAVORITES:
-            if model_id in available:
-                out.append({
-                    "name": name,
-                    "provider": "openrouter",
-                    "model": model_id,
-                })
-
-        if not out:
+            # Fallback: если API не отвечает, показываем хотя бы избранные модели
             for name, model_id in self.OPENROUTER_FAVORITES:
                 out.append({
                     "name": name,
                     "provider": "openrouter",
                     "model": model_id,
                 })
-
         return out
 
     def _kimi_models(self):
@@ -251,8 +248,14 @@ class Agent:
 
         lower = html.lower()
         if "<html" not in lower and "<!doctype" not in lower:
-            raise ValueError("Ответ не похож на полный HTML")
-
+            # fallback: оборачиваем в базовую страницу
+            html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Agent Page</title></head>
+<body>
+{html}
+</body>
+</html>"""
         return html
 
     def _system_prompt(self) -> str:
@@ -284,7 +287,7 @@ class Agent:
 - отвечай по-русски;
 - стиль по умолчанию минималистичный;
 - если пользователь не попросил другое, сохраняй спокойную PI-like эстетику;
-- если пользователь не просил другое, базовый фон держи в духе rgb(20, 40, 76).
+- если пользователь не попросил другое, базовый фон держи в духе rgb(20, 40, 76).
         """.strip()
 
     def _call_provider(self, provider: str, model: str, messages: list) -> str:
@@ -292,7 +295,7 @@ class Agent:
 
         if provider == "groq":
             if not self.groq_key:
-                raise RuntimeError("GROQ_API_KEY не задан")
+                raise RuntimeError("GROQ_API_KEY not set")
             url = "https://api.groq.com/openai/v1/chat/completions"
             headers = {
                 "Authorization": f"Bearer {self.groq_key}",
@@ -301,7 +304,7 @@ class Agent:
 
         elif provider == "openrouter":
             if not self.openrouter_key:
-                raise RuntimeError("OPENROUTER_API_KEY не задан")
+                raise RuntimeError("OPENROUTER_API_KEY not set")
             url = "https://openrouter.ai/api/v1/chat/completions"
             headers = {
                 "Authorization": f"Bearer {self.openrouter_key}",
@@ -312,7 +315,7 @@ class Agent:
 
         elif provider == "kimi":
             if not self.kimi_key:
-                raise RuntimeError("KIMI_API_KEY не задан")
+                raise RuntimeError("KIMI_API_KEY not set")
             url = "https://api.moonshot.ai/v1/chat/completions"
             headers = {
                 "Authorization": f"Bearer {self.kimi_key}",
@@ -320,7 +323,7 @@ class Agent:
             }
 
         else:
-            raise RuntimeError(f"Неизвестный provider: {provider}")
+            raise RuntimeError(f"Unknown provider: {provider}")
 
         payload = {
             "model": model,
@@ -344,7 +347,7 @@ class Agent:
         clean_message = (message or "").strip()
 
         if not clean_message:
-            return {"success": False, "error": "Пустое сообщение"}
+            return {"success": False, "error": "Empty message"}
 
         lower = clean_message.lower()
 
@@ -392,7 +395,7 @@ class Agent:
         data = self._extract_json(raw_reply)
 
         mode = str(data.get("mode") or "chat").strip().lower()
-        assistant_text = str(data.get("assistant") or "").strip() or "Готово."
+        assistant_text = str(data.get("assistant") or "").strip() or "Done."
         html = str(data.get("html") or "").strip()
 
         changed = False
@@ -415,35 +418,29 @@ class Agent:
 
 agent = Agent()
 
+# Глобальный оверрайд модели полностью удалён.
+# Если нужно принудительно задать модель для всех сессий,
+# используйте переменные окружения или удалите/отредактируйте файл global_model.json
+# и раскомментируйте код ниже (НО ЭТО НЕ РЕКОМЕНДУЕТСЯ, ТАК КАК ЛОМАЕТ ВЫБОР В UI).
 
-# BEGIN GLOBAL_MODEL_OVERRIDE
-import json as _gmo_json
-from pathlib import Path as _gmo_Path
-
-_GMO_FILE = _gmo_Path("/opt/my-agent/global_model.json")
-
-def _gmo_load():
-    try:
-        data = _gmo_json.loads(_GMO_FILE.read_text(encoding="utf-8"))
-        provider = str(data.get("provider") or "").strip()
-        model = str(data.get("model") or "").strip()
-        if provider and model:
-            return provider, model
-    except Exception:
-        pass
-    return None, None
-
-if not getattr(Agent.chat, "__name__", "") == "_agent_chat_with_global_model":
-    _AGENT_CHAT_ORIG = Agent.chat
-
-    def _agent_chat_with_global_model(self, session_name: str, message: str, provider=None, model=None):
-        gp, gm = _gmo_load()
-        if gp and gm:
-            provider, model = gp, gm
-        return _AGENT_CHAT_ORIG(self, session_name, message, provider=provider, model=model)
-
-    Agent.chat = _agent_chat_with_global_model
-# END GLOBAL_MODEL_OVERRIDE
-
-
-
+# import json as _gmo_json
+# from pathlib import Path as _gmo_Path
+# _GMO_FILE = _gmo_Path("/opt/my-agent/global_model.json")
+# def _gmo_load():
+#     try:
+#         data = _gmo_json.loads(_GMO_FILE.read_text(encoding="utf-8"))
+#         provider = str(data.get("provider") or "").strip()
+#         model = str(data.get("model") or "").strip()
+#         if provider and model:
+#             return provider, model
+#     except Exception:
+#         pass
+#     return None, None
+# if not getattr(Agent.chat, "__name__", "") == "_agent_chat_with_global_model":
+#     _AGENT_CHAT_ORIG = Agent.chat
+#     def _agent_chat_with_global_model(self, session_name: str, message: str, provider=None, model=None):
+#         gp, gm = _gmo_load()
+#         if gp and gm:
+#             provider, model = gp, gm
+#         return _AGENT_CHAT_ORIG(self, session_name, message, provider=provider, model=model)
+#     Agent.chat = _agent_chat_with_global_model
