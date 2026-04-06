@@ -139,7 +139,7 @@ body{
     font-family:'Cormorant Garamond',Georgia,serif;
     font-size:11px;
     font-style:italic;
-    line-height: 22px;       /* фиксированная высота строки */
+    line-height: 22px;
     height: 24px;
     letter-spacing:0.9px;
     backdrop-filter:blur(10px);
@@ -178,7 +178,7 @@ body{
 
 #sessionCurrent,
 #modelCurrent{
-    line-height: 22px;       /* ровно как у кнопок */
+    line-height: 22px;
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
@@ -194,7 +194,7 @@ body{
     font-size:12px;
     opacity:0.62;
     text-align:right;
-    padding-right: var(--dock-right-gap);  /* 5px от правого края */
+    padding-right: var(--dock-right-gap);
 }
 
 #sessionCurrent.admin-clickable,
@@ -238,7 +238,7 @@ body{
 }
 
 #modelDropdown{
-    right:calc(-1 * var(--dock-right-gap));
+    right: 0;                 /* ← исправлено: было calc(-1 * var(--dock-right-gap)) */
     width:max-content;
     max-width:360px;
     margin-bottom:6px;
@@ -399,6 +399,8 @@ body{
 <script>
 const rawAlias = location.search.length > 1 ? decodeURIComponent(location.search.slice(1)) : '';
 const ADMIN_HEADER = rawAlias;
+const IS_FILE_PROTOCOL = location.protocol === 'file:';
+const FORCE_PREVIEW = rawAlias === 'preview-ui' || location.hash === '#preview-ui' || IS_FILE_PROTOCOL;
 
 const chatDiv = document.getElementById('chatMessages');
 const input = document.getElementById('messageInput');
@@ -428,16 +430,23 @@ let models = [];
 let sessions = [];
 let poller = null;
 
+// Фейковые данные для preview-режима (чтобы кнопка сессии работала локально)
+const previewSessions = ['private', 'work', 'test', 'archive'];
+const previewModels = [
+  { provider: 'groq', model: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B Instant' },
+  { provider: 'openrouter', model: 'google/gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+  { provider: 'anthropic', model: 'claude-3.7-sonnet', name: 'Claude 3.7 Sonnet' },
+  { provider: 'meta-llama', model: 'Llama-4-Scout-17B-16E-Instruct', name: 'Llama 4 Scout' }
+];
+
 function shortenLabel(provider, name) {
   let p = provider.toLowerCase();
   if (p === 'openrouter') p = 'OR';
   if (p === 'meta-llama') p = 'ml';
-
   let shortName = name
     .replace(/Google Banana 2 \(Gemini/gi, 'Gemini')
     .replace(/Gemini 3\.1 Flash, Image, Preview/gi, 'Gemini 3.5 Flash')
     .replace(/Gemini 2\.5 Flash/gi, 'Gemini 2.5 Flash');
-
   return `${p}: ${shortName}`;
 }
 
@@ -542,7 +551,16 @@ function renderSessionDock() {
       localStorage.setItem('pi_admin_target_session', currentSession);
       renderSessionDock();
       closeAllDropdowns();
-      await loadHistory();
+      if (FORCE_PREVIEW) {
+        // В preview просто показываем уведомление
+        const msg = document.createElement('div');
+        msg.className = 'msg assistant';
+        msg.textContent = `Сессия изменена на "${s}" (preview-режим)`;
+        chatDiv.appendChild(msg);
+        chatDiv.scrollTop = chatDiv.scrollHeight;
+      } else {
+        await loadHistory();
+      }
     };
     sessionDropdown.appendChild(el);
   }
@@ -569,12 +587,26 @@ function renderModelDock() {
     el.title = `${m.provider}: ${m.name || m.model}`;
     el.onclick = async (e) => {
       e.stopPropagation();
+      if (FORCE_PREVIEW) {
+        currentModel = {
+          provider: m.provider,
+          model: m.model,
+          label: shortenLabel(m.provider, m.name || m.model)
+        };
+        renderModelDock();
+        closeAllDropdowns();
+        const msg = document.createElement('div');
+        msg.className = 'msg assistant';
+        msg.textContent = `Модель изменена на ${currentModel.label} (preview)`;
+        chatDiv.appendChild(msg);
+        chatDiv.scrollTop = chatDiv.scrollHeight;
+        return;
+      }
       try {
         const data = await api('POST', '/admin/set_model', {
           provider: m.provider,
           model: m.model
         }, true);
-
         currentModel = {
           provider: data.provider,
           model: data.model,
@@ -659,6 +691,25 @@ async function sendMessage() {
   setThinking(true);
 
   try {
+    if (FORCE_PREVIEW) {
+      const wrapUser = document.createElement('div');
+      wrapUser.className = 'msgWrap';
+      const msgUser = document.createElement('div');
+      msgUser.className = 'msg user';
+      msgUser.textContent = text;
+      wrapUser.appendChild(msgUser);
+      chatDiv.appendChild(wrapUser);
+      const wrapAss = document.createElement('div');
+      wrapAss.className = 'msgWrap';
+      const msgAss = document.createElement('div');
+      msgAss.className = 'msg assistant';
+      msgAss.textContent = 'Preview-ответ (без сервера). Сессии и модели работают локально.';
+      wrapAss.appendChild(msgAss);
+      chatDiv.appendChild(wrapAss);
+      chatDiv.scrollTop = chatDiv.scrollHeight;
+      return;
+    }
+
     if (adminMode) {
       const data = await api('POST', '/admin/chat', {
         session: currentSession,
@@ -685,6 +736,7 @@ async function sendMessage() {
 }
 
 function startPolling() {
+  if (FORCE_PREVIEW) return;
   if (poller) clearInterval(poller);
   poller = setInterval(async () => {
     try {
@@ -704,7 +756,6 @@ input.addEventListener('keydown', (e) => {
   }
 });
 
-// ИСПРАВЛЕННЫЙ ОБРАБОТЧИК ДЛЯ КНОПКИ СЕССИИ
 sessionCurrent.addEventListener('click', (e) => {
   e.stopPropagation();
   if (!adminMode) return;
@@ -713,6 +764,14 @@ sessionCurrent.addEventListener('click', (e) => {
 
 undoBtn.onclick = async () => {
   try {
+    if (FORCE_PREVIEW) {
+      const msg = document.createElement('div');
+      msg.className = 'msg assistant';
+      msg.textContent = 'Undo в preview-режиме не реализован';
+      chatDiv.appendChild(msg);
+      chatDiv.scrollTop = chatDiv.scrollHeight;
+      return;
+    }
     await api('POST', '/admin/undo', {session: currentSession}, true);
     await loadHistory();
     location.reload();
@@ -723,6 +782,14 @@ undoBtn.onclick = async () => {
 
 clearBtn.onclick = async () => {
   try {
+    if (FORCE_PREVIEW) {
+      const msg = document.createElement('div');
+      msg.className = 'msg assistant';
+      msg.textContent = 'Clear в preview-режиме не реализован';
+      chatDiv.appendChild(msg);
+      chatDiv.scrollTop = chatDiv.scrollHeight;
+      return;
+    }
     await api('POST', '/admin/clear_session', {session: currentSession}, true);
     await loadHistory();
   } catch (e) {
@@ -732,6 +799,14 @@ clearBtn.onclick = async () => {
 
 clearAllBtn.onclick = async () => {
   try {
+    if (FORCE_PREVIEW) {
+      const msg = document.createElement('div');
+      msg.className = 'msg assistant';
+      msg.textContent = 'Clear ALL в preview-режиме не реализован';
+      chatDiv.appendChild(msg);
+      chatDiv.scrollTop = chatDiv.scrollHeight;
+      return;
+    }
     await api('POST', '/admin/clear_all_histories', {}, true);
     await loadHistory();
   } catch (e) {
@@ -761,7 +836,23 @@ fsZone.addEventListener('click', () => {
 
 (async function init() {
   try {
-    if (rawAlias.includes('-admin-')) {
+    if (FORCE_PREVIEW) {
+      // Включаем админ-режим с фейковыми данными для локального теста
+      adminMode = true;
+      adminControls.style.display = 'flex';
+      pathDisplay.textContent = '~/projects/pi-ru · preview';
+      sessions = previewSessions;
+      models = previewModels;
+      currentSession = localStorage.getItem('pi_admin_target_session') || sessions[0];
+      currentModel = {
+        provider: models[0].provider,
+        model: models[0].model,
+        label: shortenLabel(models[0].provider, models[0].name || models[0].model)
+      };
+      renderSessionDock();
+      renderModelDock();
+      renderHistory([{role:'assistant', content:'Preview-режим активен. Кнопка выбора сессии работает, модели можно выбирать. Отступы исправлены.'}]);
+    } else if (rawAlias.includes('-admin-')) {
       await loadAdmin();
     } else {
       await loadPublic();
