@@ -237,6 +237,15 @@ let currentModel = {
 let models = [];
 let poller = null;
 
+// Функция сокращения названия провайдера (как было)
+function shortenLabel(provider, name) {
+  let p = provider.toLowerCase();
+  if (p === 'openrouter') p = 'OR';
+  if (p === 'meta-llama') p = 'ml';
+  // можно добавить другие сокращения
+  return `${p}: ${name}`;
+}
+
 function setThinking(v) {
   sendLabel.classList.toggle('thinking', !!v);
   sendLabel.textContent = v ? '...' : 'Send';
@@ -307,11 +316,23 @@ function renderModelDock() {
 
   modelCurrent.classList.add('admin-clickable');
 
-  for (const m of models) {
+  // Сортируем модели: сначала groq, потом openrouter, потом остальные по алфавиту
+  const sorted = [...models].sort((a, b) => {
+    const order = { groq: 1, openrouter: 2 };
+    const pa = a.provider.toLowerCase();
+    const pb = b.provider.toLowerCase();
+    if (order[pa] && order[pb]) return order[pa] - order[pb];
+    if (order[pa]) return -1;
+    if (order[pb]) return 1;
+    return pa.localeCompare(pb);
+  });
+
+  for (const m of sorted) {
     const isActive = m.provider === currentModel.provider && m.model === currentModel.model;
     const el = document.createElement('div');
     el.className = 'model-option' + (isActive ? ' active' : '');
-    el.textContent = m.name;
+    // Используем shortenLabel для отображения префикса провайдера
+    el.textContent = shortenLabel(m.provider, m.name || m.model);
     el.onclick = async (e) => {
       e.stopPropagation();
       try {
@@ -323,7 +344,7 @@ function renderModelDock() {
         currentModel = {
           provider: data.provider,
           model: data.model,
-          label: data.label || m.name
+          label: data.label || shortenLabel(data.provider, data.model)
         };
         renderModelDock();
         modelDropdown.style.display = 'none';
