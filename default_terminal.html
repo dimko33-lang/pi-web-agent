@@ -155,12 +155,12 @@ body{
     cursor:pointer;
 }
 
+/* Исходное позиционирование — без сдвига */
 #modelDropdown{
     display:none;
     position:absolute;
     bottom: 100%;
     right:0;
-    transform: translateY(6px);  /* минимальный сдвиг, чтобы верхняя модель стала видна */
     background:transparent;
     backdrop-filter:blur(4px);
     padding: 4px 0;
@@ -249,7 +249,7 @@ body{
     #adminControls::-webkit-scrollbar{ display:none; }
     #adminControls select, #adminControls button{ font-size:10px; padding:2px 4px; height:22px; }
     #modelCurrent{ font-size:10px; max-width:120px; overflow:hidden; text-overflow:ellipsis; }
-    #modelDropdown{ max-width:92vw; transform: translateY(5px); }
+    #modelDropdown{ max-width:92vw; }
 }
 
 ::-webkit-scrollbar{width:8px}
@@ -582,10 +582,16 @@ clearAllBtn.onclick = async () => {
 
 refreshBtn.onclick = () => location.reload();
 
+// ИСПРАВЛЕНИЕ: при открытии списка автоматически прокручиваем вниз на 20px, чтобы верхняя модель стала видна
 modelCurrent.onclick = (e) => {
   e.stopPropagation();
   if (!adminMode) return;
-  modelDropdown.style.display = modelDropdown.style.display === 'block' ? 'none' : 'block';
+  if (modelDropdown.style.display === 'block') {
+    modelDropdown.style.display = 'none';
+  } else {
+    modelDropdown.style.display = 'block';
+    modelDropdown.scrollTop = 20;   // прокрутка внутрь списка, низ не смещается
+  }
 };
 
 document.addEventListener('click', () => {
