@@ -194,7 +194,7 @@ body{
     font-size:12px;
     opacity:0.62;
     text-align:right;
-    padding-right:var(--dock-right-gap);
+    padding-right:var(--dock-right-gap); /* 5px от правого края */
 }
 
 #sessionCurrent.admin-clickable,
@@ -478,7 +478,7 @@ function toggleDropdown(dropdown, trigger) {
   if (willOpen) {
     dropdown.style.display = 'block';
     if (trigger) trigger.classList.add('active');
-    // Прокручиваем список моделей в самый верх, чтобы была видна верхняя модель
+    // Прокручиваем список моделей в самый верх, чтобы верхняя модель была видна
     if (dropdown === modelDropdown) {
       dropdown.scrollTop = 0;
     }
