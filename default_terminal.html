@@ -61,61 +61,39 @@ body{
 #adminControls{
     display:none;align-items:center;gap:6px;min-width:0;flex:1 1 auto;justify-content:center;
 }
-#adminControls button,
-.control-trigger{
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    background:var(--glass-bg);
+#adminControls select,
+#adminControls button{
+    background:rgba(255,255,255,0.08);
     color:#fff;
-    border:1px solid var(--glass-border);
+    border:1px solid rgba(255,255,255,0.18);
     border-radius:3px;
     padding:3px 8px;
     font-family:'Cormorant Garamond',Georgia,serif;
     font-size:11px;
     font-style:italic;
-    line-height: 22px;
-    height: 24px;
+    line-height:22px;
+    height:24px;
     letter-spacing:0.9px;
     backdrop-filter:blur(10px);
     -webkit-backdrop-filter:blur(10px);
-    box-sizing:border-box;
+    transition:all 0.2s;
     vertical-align: middle;
-    transition:background 0.2s, border-color 0.2s, color 0.2s;
-}
-#adminControls button{
+    margin:0;
     cursor:pointer;
 }
-#adminControls button:hover,
-.control-trigger:hover,
-.control-trigger.active{
-    background:var(--glass-bg-hover);
-    border-color:var(--glass-border-strong);
+#adminControls select{
+    min-width:130px;
+    text-align:center;
 }
-#sessionDock,
-#modelDock{
-    position:relative;
-    flex:0 0 auto;
-    user-select:none;
-    min-width:0;
-}
-#sessionDock{
-    max-width:180px;
+#adminControls select:hover,
+#adminControls button:hover{
+    background:rgba(255,255,255,0.12);
+    border-color:rgba(255,255,255,0.26);
 }
 #modelDock{
     margin-left:auto;
-}
-#sessionCurrent,
-#modelCurrent{
-    line-height: 22px;
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    cursor:default;
-}
-#sessionCurrent{
-    min-width:86px;
-    text-align:center;
+    position:relative;
+    flex:0 0 auto;
 }
 #modelCurrent{
     font-size:12px;
@@ -124,44 +102,27 @@ body{
     padding-right: var(--dock-right-gap);
     cursor:pointer;
 }
-#sessionCurrent.admin-clickable,
 #modelCurrent.admin-clickable{
     cursor:pointer;
 }
-#sessionCurrent.admin-clickable:hover,
-#modelCurrent.admin-clickable:hover{
-    color:rgba(255,255,255,0.96);
-}
-.glass-dropdown{
+#modelDropdown{
     display:none;
     position:absolute;
     bottom:100%;
+    right:0;
     background:transparent;
     backdrop-filter:blur(4px);
-    -webkit-backdrop-filter:blur(4px);
-    border:none;
-    box-shadow:none;
     padding:6px 0 4px 0;
     z-index:40;
     white-space:nowrap;
-    overflow-y:auto;
-    scrollbar-gutter:stable;
     max-height:calc(100dvh - 80px);
-}
-#sessionDropdown{
-    left:0;
-    min-width:100%;
-    width:max-content;
-    max-width:260px;
-    margin-bottom:6px;
-}
-#modelDropdown{
-    right:0;
+    overflow-y:auto;
+    border:none;
     width:max-content;
     max-width:360px;
     margin-bottom:6px;
 }
-.glass-option{
+.model-option{
     position:relative;
     padding:7px var(--dock-right-gap) 7px 10px;
     color:rgba(255,255,255,0.72);
@@ -177,24 +138,17 @@ body{
     border:none;
     border-radius:0;
     transition:background 0.18s, color 0.18s, opacity 0.18s;
-    text-align:center;
-}
-#sessionDropdown .glass-option{
-    text-align:center;
-    padding-right:10px;
-}
-#modelDropdown .glass-option{
     text-align:right;
 }
-.glass-option:hover{
+.model-option:hover{
     background:linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.03) 55%, rgba(255,255,255,0.07) 100%);
     color:rgba(255,255,255,0.9);
 }
-.glass-option.active{
+.model-option.active{
     background:linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.04) 48%, rgba(255,255,255,0.1) 100%);
     color:rgba(255,255,255,0.96);
 }
-.glass-option.active::after{
+.model-option.active::after{
     content:'';
     position:absolute;
     top:5px;
@@ -202,13 +156,6 @@ body{
     right:0;
     width:1px;
     background:rgba(255,255,255,0.22);
-}
-#modelDropdown .glass-option.active::after{
-    right:0;
-}
-#sessionDropdown .glass-option.active::after{
-    right:auto;
-    left:0;
 }
 .msgWrap{margin-bottom:4px;}
 .msgWrap.adminDeletable{cursor:pointer;}
@@ -226,11 +173,7 @@ body{
     #pathDisplay{font-size:12px;max-width:80px;overflow:hidden;}
     #adminControls{gap:4px;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;}
     #adminControls::-webkit-scrollbar{display:none;}
-    #adminControls button, .control-trigger{font-size:10px;padding:2px 6px;height:22px;line-height:20px;}
-    #sessionDock{max-width:132px;}
-    #sessionCurrent{min-width:72px;}
-    #modelCurrent{font-size:10px;max-width:120px;}
-    #sessionDropdown{max-width:78vw;}
+    #adminControls select,#adminControls button{font-size:10px;padding:2px 4px;height:22px;}
     #modelDropdown{max-width:92vw;}
 }
 ::-webkit-scrollbar{width:8px}
@@ -248,10 +191,7 @@ body{
 <div id="bottomBar">
   <div id="pathDisplay">pi-web</div>
   <div id="adminControls">
-    <div id="sessionDock">
-      <div id="sessionCurrent" class="control-trigger">session</div>
-      <div id="sessionDropdown" class="glass-dropdown"></div>
-    </div>
+    <select id="sessionSelect"></select>
     <button id="undoBtn" type="button">undo</button>
     <button id="clearBtn" type="button">clear</button>
     <button id="clearAllBtn" type="button">clear ALL</button>
@@ -259,7 +199,7 @@ body{
   </div>
   <div id="modelDock">
     <div id="modelCurrent">Loading...</div>
-    <div id="modelDropdown" class="glass-dropdown"></div>
+    <div id="modelDropdown"></div>
   </div>
 </div>
 
@@ -276,8 +216,7 @@ const pathDisplay = document.getElementById('pathDisplay');
 const fsZone = document.getElementById('fullscreenZone');
 
 const adminControls = document.getElementById('adminControls');
-const sessionCurrent = document.getElementById('sessionCurrent');
-const sessionDropdown = document.getElementById('sessionDropdown');
+const sessionSelect = document.getElementById('sessionSelect');
 const undoBtn = document.getElementById('undoBtn');
 const clearBtn = document.getElementById('clearBtn');
 const clearAllBtn = document.getElementById('clearAllBtn');
@@ -294,7 +233,6 @@ let currentModel = {
   label: 'Groq · Llama 3.1 8B (fast/free)'
 };
 let models = [];
-let sessions = [];
 let poller = null;
 
 function setThinking(v) {
@@ -320,24 +258,6 @@ function api(method, url, data=null, admin=false) {
 function autoResize() {
   input.style.height = 'auto';
   input.style.height = Math.min(input.scrollHeight, 120) + 'px';
-}
-
-function closeAllDropdowns() {
-  modelDropdown.style.display = 'none';
-  sessionDropdown.style.display = 'none';
-  sessionCurrent.classList.remove('active');
-}
-
-function toggleDropdown(dropdown, trigger) {
-  const willOpen = dropdown.style.display !== 'block';
-  closeAllDropdowns();
-  if (willOpen) {
-    dropdown.style.display = 'block';
-    if (trigger) trigger.classList.add('active');
-    if (dropdown === modelDropdown) {
-      dropdown.scrollTop = 0;
-    }
-  }
 }
 
 function renderHistory(items) {
@@ -373,40 +293,8 @@ function renderHistory(items) {
   chatDiv.scrollTop = chatDiv.scrollHeight;
 }
 
-function renderSessionDock() {
-  sessionDropdown.innerHTML = '';
-
-  if (!adminMode) {
-    sessionCurrent.textContent = 'session';
-    sessionCurrent.classList.remove('admin-clickable');
-    sessionDropdown.style.display = 'none';
-    return;
-  }
-
-  sessionCurrent.classList.add('admin-clickable');
-  sessionCurrent.textContent = currentSession;
-  sessionCurrent.title = currentSession;
-
-  for (const s of sessions) {
-    const el = document.createElement('div');
-    el.className = 'glass-option' + (s === currentSession ? ' active' : '');
-    el.textContent = s;
-    el.title = s;
-    el.onclick = async (e) => {
-      e.stopPropagation();
-      currentSession = s;
-      localStorage.setItem('pi_admin_target_session', currentSession);
-      renderSessionDock();
-      closeAllDropdowns();
-      await loadHistory();
-    };
-    sessionDropdown.appendChild(el);
-  }
-}
-
 function renderModelDock() {
   modelCurrent.textContent = currentModel.label || (currentModel.provider + ' / ' + currentModel.model);
-  modelCurrent.title = modelCurrent.textContent;
   modelDropdown.innerHTML = '';
 
   if (!adminMode) {
@@ -420,7 +308,7 @@ function renderModelDock() {
   for (const m of models) {
     const isActive = m.provider === currentModel.provider && m.model === currentModel.model;
     const el = document.createElement('div');
-    el.className = 'glass-option' + (isActive ? ' active' : '');
+    el.className = 'model-option' + (isActive ? ' active' : '');
     el.textContent = m.name;
     el.onclick = async (e) => {
       e.stopPropagation();
@@ -436,7 +324,7 @@ function renderModelDock() {
           label: data.label || m.name
         };
         renderModelDock();
-        closeAllDropdowns();
+        modelDropdown.style.display = 'none';
       } catch (e2) {
         console.error(e2);
       }
@@ -470,7 +358,6 @@ async function loadPublic() {
   adminMode = false;
   adminControls.style.display = 'none';
   pathDisplay.textContent = 'pi-web';
-  renderSessionDock();
   await syncGlobalModel();
   await loadHistory();
 }
@@ -484,13 +371,20 @@ async function loadAdmin() {
   await loadModels();
 
   currentModel = state.global_model || currentModel;
-  sessions = state.sessions || [];
   currentSession = localStorage.getItem('pi_admin_target_session') || 'private';
-  if (!sessions.includes(currentSession)) {
-    currentSession = sessions.includes('private') ? 'private' : (sessions[0] || 'default');
+  if (!state.sessions.includes(currentSession)) {
+    currentSession = state.sessions.includes('private') ? 'private' : (state.sessions[0] || 'default');
   }
 
-  renderSessionDock();
+  sessionSelect.innerHTML = '';
+  for (const s of state.sessions) {
+    const opt = document.createElement('option');
+    opt.value = s;
+    opt.textContent = s;
+    if (s === currentSession) opt.selected = true;
+    sessionSelect.appendChild(opt);
+  }
+
   renderModelDock();
   await loadHistory();
 }
@@ -559,10 +453,10 @@ input.addEventListener('keydown', (e) => {
   }
 });
 
-sessionCurrent.addEventListener('click', (e) => {
-  e.stopPropagation();
-  if (!adminMode) return;
-  toggleDropdown(sessionDropdown, sessionCurrent);
+sessionSelect.addEventListener('change', async () => {
+  currentSession = sessionSelect.value;
+  localStorage.setItem('pi_admin_target_session', currentSession);
+  await loadHistory();
 });
 
 undoBtn.onclick = async () => {
@@ -598,15 +492,18 @@ refreshBtn.onclick = () => location.reload();
 modelCurrent.onclick = (e) => {
   e.stopPropagation();
   if (!adminMode) return;
-  toggleDropdown(modelDropdown);
+  const willOpen = modelDropdown.style.display !== 'block';
+  if (willOpen) {
+    modelDropdown.style.display = 'block';
+    modelDropdown.scrollTop = 0;
+  } else {
+    modelDropdown.style.display = 'none';
+  }
 };
 
 document.addEventListener('click', () => {
-  closeAllDropdowns();
+  modelDropdown.style.display = 'none';
 });
-
-sessionDropdown.addEventListener('click', (e) => e.stopPropagation());
-modelDropdown.addEventListener('click', (e) => e.stopPropagation());
 
 fsZone.addEventListener('click', () => {
   if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
