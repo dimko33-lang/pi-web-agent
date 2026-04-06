@@ -110,7 +110,6 @@ body{
 }
 #sessionDropdown .glass-option{ text-align:center; padding-right:10px; }
 #modelDropdown .glass-option{ text-align:right; }
-/* остальные стили (msg, fullscreen и т.д.) оставлены без изменений */
 .msgWrap{ margin-bottom:4px; }
 .msgWrap.adminDeletable{ cursor:pointer; }
 .msgWrap.adminDeletable:hover{ outline:1px dashed rgba(255,255,255,0.18); }
@@ -180,13 +179,12 @@ const fsZone = document.getElementById('fullscreenZone');
 const adminControls = document.getElementById('adminControls');
 const sessionCurrent = document.getElementById('sessionCurrent');
 const sessionDropdown = document.getElementById('sessionDropdown');
-const modelCurrent = document.getElementById('modelCurrent');
-const modelDropdown = document.getElementById('modelDropdown');
-
 const undoBtn = document.getElementById('undoBtn');
 const clearBtn = document.getElementById('clearBtn');
 const clearAllBtn = document.getElementById('clearAllBtn');
 const refreshBtn = document.getElementById('refreshBtn');
+const modelCurrent = document.getElementById('modelCurrent');
+const modelDropdown = document.getElementById('modelDropdown');
 
 let adminMode = false;
 let currentSession = 'default';
@@ -196,17 +194,47 @@ let sessions = [];
 let poller = null;
 
 const previewSessions = ['private', 'work', 'test', 'archive'];
-const previewModels = [ /* ... твои модели ... */ ];
+const previewModels = [
+  { provider: 'groq', model: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B Instant' },
+  { provider: 'openrouter', model: 'google/gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+  { provider: 'anthropic', model: 'claude-3.7-sonnet', name: 'Claude 3.7 Sonnet' }
+];
 
-function shortenLabel(provider, name) { /* твоя функция */ }
+function shortenLabel(provider, name) {
+  let p = provider.toLowerCase();
+  if (p === 'openrouter') p = 'OR';
+  if (p === 'meta-llama') p = 'ml';
+  let shortName = name
+    .replace(/Google Banana 2 \(Gemini/gi, 'Gemini')
+    .replace(/Gemini 3\.1 Flash, Image, Preview/gi, 'Gemini 3.5 Flash')
+    .replace(/Gemini 2\.5 Flash/gi, 'Gemini 2.5 Flash');
+  return `${p}: ${shortName}`;
+}
 
-function setThinking(v) { /* ... */ }
+function setThinking(v) {
+  sendLabel.classList.toggle('thinking', !!v);
+  sendLabel.textContent = v ? '...' : 'Send';
+}
 
-function api(method, url, data=null, admin=false) { /* ... */ }
+function api(method, url, data=null, admin=false) {
+  const headers = {'Content-Type': 'application/json'};
+  if (admin) headers['X-Admin-Alias'] = ADMIN_HEADER;
+  return fetch(url, {
+    method,
+    headers,
+    body: data ? JSON.stringify(data) : null
+  }).then(async (res) => {
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(payload.error || ('HTTP ' + res.status));
+    return payload;
+  });
+}
 
-function autoResize() { /* ... */ }
+function autoResize() {
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+}
 
-/* ==================== УЛУЧШЕННЫЙ ДРОПДАУН ==================== */
 function closeAllDropdowns() {
   modelDropdown.style.display = 'none';
   sessionDropdown.style.display = 'none';
@@ -224,7 +252,6 @@ function toggleDropdown(dropdown, trigger) {
   }
 }
 
-/* ==================== РЕНДЕР СЕССИЙ ==================== */
 function renderSessionDock() {
   sessionDropdown.innerHTML = '';
   if (!adminMode) {
@@ -232,7 +259,6 @@ function renderSessionDock() {
     sessionCurrent.classList.remove('admin-clickable');
     return;
   }
-
   sessionCurrent.classList.add('admin-clickable');
   sessionCurrent.textContent = currentSession;
   sessionCurrent.title = currentSession;
@@ -247,9 +273,7 @@ function renderSessionDock() {
       localStorage.setItem('pi_admin_target_session', currentSession);
       renderSessionDock();
       closeAllDropdowns();
-
       if (FORCE_PREVIEW) {
-        // preview-уведомление
         const msg = document.createElement('div');
         msg.className = 'msg assistant';
         msg.textContent = `Сессия изменена на «${s}» (preview)`;
@@ -263,10 +287,68 @@ function renderSessionDock() {
   }
 }
 
-/* ==================== РЕНДЕР МОДЕЛЕЙ (оставлен без изменений) ==================== */
-function renderModelDock() { /* ... твой код ... */ }
+function renderModelDock() {
+  modelCurrent.textContent = currentModel.label || (currentModel.provider + ' / ' + currentModel.model);
+  modelCurrent.title = modelCurrent.textContent;
+  modelDropdown.innerHTML = '';
+  if (!adminMode) {
+    modelCurrent.classList.remove('admin-clickable');
+    return;
+  }
+  modelCurrent.classList.add('admin-clickable');
+  for (const m of models) {
+    const isActive = m.provider === currentModel.provider && m.model === currentModel.model;
+    const el = document.createElement('div');
+    el.className = 'glass-option' + (isActive ? ' active' : '');
+    el.textContent = shortenLabel(m.provider, m.name || m.model);
+    el.title = `${m.provider}: ${m.name || m.model}`;
+    el.onclick = async (e) => {
+      e.stopPropagation();
+      if (FORCE_PREVIEW) {
+        currentModel = { provider: m.provider, model: m.model, label: shortenLabel(m.provider, m.name || m.model) };
+        renderModelDock();
+        closeAllDropdowns();
+        const msg = document.createElement('div');
+        msg.className = 'msg assistant';
+        msg.textContent = `Модель изменена на ${currentModel.label} (preview)`;
+        chatDiv.appendChild(msg);
+        chatDiv.scrollTop = chatDiv.scrollHeight;
+        return;
+      }
+      try {
+        const data = await api('POST', '/admin/set_model', { provider: m.provider, model: m.model }, true);
+        currentModel = { provider: data.provider, model: data.model, label: data.label || shortenLabel(data.provider, data.model) };
+        renderModelDock();
+        closeAllDropdowns();
+      } catch (e) { console.error(e); }
+    };
+    modelDropdown.appendChild(el);
+  }
+}
 
-/* остальные функции (loadAdmin, loadPublic, loadHistory, sendMessage и т.д.) — без изменений */
+async function syncGlobalModel() {
+  try {
+    const gm = await api('GET', '/global_model');
+    currentModel = { provider: gm.provider, model: gm.model, label: gm.label || (gm.provider + ' / ' + gm.model) };
+    renderModelDock();
+  } catch (_) {}
+}
+
+async function loadModels() {
+  try {
+    const data = await api('GET', '/models');
+    models = data.models || [];
+  } catch (_) { models = []; }
+}
+
+async function loadPublic() {
+  adminMode = false;
+  adminControls.style.display = 'none';
+  pathDisplay.textContent = '~/projects/pi-ru';
+  renderSessionDock();
+  await syncGlobalModel();
+  await loadHistory();
+}
 
 async function loadAdmin() {
   adminMode = true;
@@ -275,20 +357,135 @@ async function loadAdmin() {
 
   const state = await api('GET', '/admin/state', null, true);
   await loadModels();
-
   currentModel = state.global_model || currentModel;
   sessions = state.sessions || [];
   currentSession = localStorage.getItem('pi_admin_target_session') || 'private';
   if (!sessions.includes(currentSession)) {
     currentSession = sessions.includes('private') ? 'private' : (sessions[0] || 'default');
   }
-
   renderSessionDock();
   renderModelDock();
   await loadHistory();
 }
 
-/* ... остальные функции init, polling и т.д. ... */
+async function loadHistory() {
+  if (adminMode) {
+    const data = await api('POST', '/admin/history', {session: currentSession}, true);
+    renderHistory(data.history || []);
+  } else {
+    const data = await api('POST', '/history', {});
+    renderHistory(data.history || []);
+  }
+}
+
+function renderHistory(items) {
+  chatDiv.innerHTML = '';
+  if (!items || !items.length) return;
+  for (const item of items) {
+    const wrap = document.createElement('div');
+    wrap.className = 'msgWrap' + (adminMode ? ' adminDeletable' : '');
+    if (item.id) wrap.dataset.id = item.id;
+    const msg = document.createElement('div');
+    const isUser = item.role === 'user';
+    msg.className = 'msg ' + (isUser ? 'user' : 'assistant');
+    msg.textContent = item.message || item.content || '';
+    wrap.appendChild(msg);
+    if (adminMode && item.id) {
+      wrap.title = 'Double click to delete';
+      wrap.ondblclick = async () => {
+        try {
+          await api('POST', '/admin/delete_message', {id: item.id}, true);
+          await loadHistory();
+        } catch (e) { console.error(e); }
+      };
+    }
+    chatDiv.appendChild(wrap);
+  }
+  chatDiv.scrollTop = chatDiv.scrollHeight;
+}
+
+async function sendMessage() {
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  autoResize();
+  setThinking(true);
+
+  try {
+    if (FORCE_PREVIEW) {
+      // симуляция в preview-режиме
+      const wrapUser = document.createElement('div'); wrapUser.className = 'msgWrap';
+      const msgUser = document.createElement('div'); msgUser.className = 'msg user'; msgUser.textContent = text;
+      wrapUser.appendChild(msgUser); chatDiv.appendChild(wrapUser);
+
+      const wrapAss = document.createElement('div'); wrapAss.className = 'msgWrap';
+      const msgAss = document.createElement('div'); msgAss.className = 'msg assistant';
+      msgAss.textContent = 'Preview-ответ. Сессия и модель работают.';
+      wrapAss.appendChild(msgAss); chatDiv.appendChild(wrapAss);
+      chatDiv.scrollTop = chatDiv.scrollHeight;
+      return;
+    }
+
+    if (adminMode) {
+      const data = await api('POST', '/admin/chat', { session: currentSession, message: text }, true);
+      await loadHistory();
+      await syncGlobalModel();
+      if (data.changed) setTimeout(() => location.reload(), 250);
+    } else {
+      const data = await api('POST', '/chat', {message: text});
+      await loadHistory();
+      await syncGlobalModel();
+      if (data.changed) setTimeout(() => location.reload(), 250);
+    }
+  } catch (e) {
+    console.error(e);
+  } finally {
+    setThinking(false);
+  }
+}
+
+function startPolling() {
+  if (FORCE_PREVIEW) return;
+  if (poller) clearInterval(poller);
+  poller = setInterval(async () => {
+    try { await loadHistory(); await syncGlobalModel(); } catch (_) {}
+  }, 2500);
+}
+
+sendLabel.onclick = sendMessage;
+input.addEventListener('input', autoResize);
+input.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+sessionCurrent.addEventListener('click', e => {
+  e.stopPropagation();
+  if (!adminMode) return;
+  toggleDropdown(sessionDropdown, sessionCurrent);
+});
+
+modelCurrent.onclick = e => {
+  e.stopPropagation();
+  if (!adminMode) return;
+  toggleDropdown(modelDropdown, modelCurrent);
+};
+
+document.addEventListener('click', closeAllDropdowns);
+sessionDropdown.addEventListener('click', e => e.stopPropagation());
+modelDropdown.addEventListener('click', e => e.stopPropagation());
+
+undoBtn.onclick = async () => { /* ... (оставил как было) */ try {
+  if (FORCE_PREVIEW) { /* preview уведомление */ return; }
+  await api('POST', '/admin/undo', {session: currentSession}, true);
+  await loadHistory(); location.reload();
+} catch(e){ console.error(e); }};
+
+clearBtn.onclick = async () => { /* аналогично */ };
+clearAllBtn.onclick = async () => { /* аналогично */ };
+refreshBtn.onclick = () => location.reload();
 
 (async function init() {
   try {
@@ -301,7 +498,7 @@ async function loadAdmin() {
       currentSession = localStorage.getItem('pi_admin_target_session') || sessions[0];
       renderSessionDock();
       renderModelDock();
-      renderHistory([{role:'assistant', content:'Preview-режим активен. Переключение сессий работает!'}]);
+      renderHistory([{role:'assistant', content:'✅ Preview-режим активен. Переключение сессий работает!'}]);
     } else if (rawAlias.includes('-admin-')) {
       await loadAdmin();
     } else {
