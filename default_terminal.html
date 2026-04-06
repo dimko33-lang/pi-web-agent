@@ -81,8 +81,8 @@ body{
 }
 
 @keyframes pulseSend{
-    0%   { opacity:.45; transform:translateY(0px); }
-    50%  { opacity:1;   transform:translateY(-1px); }
+    0% { opacity:.45; transform:translateY(0px); }
+    50% { opacity:1; transform:translateY(-1px); }
     100% { opacity:.45; transform:translateY(0px); }
 }
 
@@ -158,14 +158,14 @@ body{
     position:absolute;
     bottom:100%;
     right:0;
-    background:rgba(20,40,76,0.88);
-    backdrop-filter:blur(14px);
+    background:transparent;
+    backdrop-filter:blur(16px);
     padding:4px 0;
     z-index:40;
     white-space:nowrap;
-    max-height:calc(100vh - 130px);   /* растянули почти до самого верха */
+    max-height:calc(100vh - 70px);
     overflow-y:auto;
-    border:1px solid rgba(255,255,255,0.12);
+    border:none;
     min-width:240px;
 }
 
@@ -218,7 +218,7 @@ body{
 
 #fullscreenZone{
     position:fixed;
-    top:5px;
+    top:3px;
     right:12px;
     width:50px;
     height:50px;
@@ -227,14 +227,13 @@ body{
     align-items:center;
     justify-content:center;
     cursor:pointer;
-    opacity:0.22;                    /* еле заметная */
+    opacity:0.3;
 }
 
 #fullscreenZone span{
-    font-size:9px;
-    color:rgba(255,255,255,0.28);
+    font-size:11px;
+    color:rgba(255,255,255,0.35);
     letter-spacing:1px;
-    text-transform:lowercase;
 }
 
 @media (max-width: 720px){
@@ -415,7 +414,7 @@ function renderModelDock() {
   for (const m of models) {
     const el = document.createElement('div');
     el.className = 'model-option';
-    el.textContent = `${m.provider} · ${m.name}`;   // ← вот то, что ты просил
+    el.textContent = `${m.provider}: ${m.name}`;
     el.onclick = async (e) => {
       e.stopPropagation();
       try {
