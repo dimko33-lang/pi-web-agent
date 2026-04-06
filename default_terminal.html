@@ -7,12 +7,15 @@
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,300;1,400&display=swap');
+
 :root{
     --glass-bg:rgba(255,255,255,0.08);
     --glass-bg-hover:rgba(255,255,255,0.12);
     --glass-border:rgba(255,255,255,0.18);
     --glass-border-strong:rgba(255,255,255,0.26);
+    --dock-right-gap:5px;
 }
+
 body{
     margin:0;padding:0;height:100dvh;
     background:rgb(20,40,76);color:#fff;
@@ -58,32 +61,90 @@ body{
 #adminControls{
     display:none;align-items:center;gap:6px;min-width:0;flex:1 1 auto;justify-content:center;
 }
-#adminControls select,#adminControls button{
+#adminControls select,
+#adminControls button{
     background:var(--glass-bg);color:#fff;border:1px solid var(--glass-border);
     border-radius:3px;padding:3px 8px;font-family:'Cormorant Garamond',Georgia,serif;
     font-size:11px;font-style:italic;line-height:22px;height:24px;
     letter-spacing:0.9px;backdrop-filter:blur(10px);transition:all 0.2s;
+    vertical-align: middle;  /* выравнивание select */
+    margin: 0;
 }
-#adminControls select:hover,#adminControls button:hover{
+#adminControls select:hover,
+#adminControls button:hover{
     background:var(--glass-bg-hover);border-color:var(--glass-border-strong);
 }
-#sessionSelect{min-width:130px;text-align:center;}
-#modelDock{margin-left:auto;position:relative;flex:0 0 auto;}
-#modelCurrent{
-    font-size:12px;opacity:0.62;text-align:right;padding-right:5px;cursor:pointer;
+#sessionSelect{
+    min-width:130px;
+    text-align:center;
 }
-#modelCurrent.admin-clickable{cursor:pointer;}
+#modelDock{
+    margin-left:auto;
+    position:relative;
+    flex:0 0 auto;
+}
+#modelCurrent{
+    font-size:12px;
+    opacity:0.62;
+    text-align:right;
+    padding-right: var(--dock-right-gap);
+    cursor:pointer;
+}
+#modelCurrent.admin-clickable{
+    cursor:pointer;
+}
 #modelDropdown{
-    display:none;position:absolute;bottom:100%;right:0;background:transparent;
-    backdrop-filter:blur(4px);padding:6px 0 4px 0;z-index:40;white-space:nowrap;
-    max-height:calc(100dvh - 80px);overflow-y:auto;border:none;max-width:360px;
+    display:none;
+    position:absolute;
+    bottom:100%;
+    right:0;
+    background:transparent;
+    backdrop-filter:blur(4px);
+    padding:6px 0 4px 0;
+    z-index:40;
+    white-space:nowrap;
+    max-height:calc(100dvh - 80px);
+    overflow-y:auto;
+    border:none;
+    width:max-content;
+    max-width:360px;
+    margin-bottom:6px;
 }
 .model-option{
-    padding:7px 12px;color:rgba(255,255,255,0.72);font-size:11px;cursor:pointer;
-    text-align:right;white-space:nowrap;font-family:'Cormorant Garamond',Georgia,serif;
-    font-weight:300;font-style:italic;transition:background 0.18s,color 0.18s;
+    position:relative;
+    padding:7px var(--dock-right-gap) 7px 10px;
+    color:rgba(255,255,255,0.72);
+    font-size:11px;
+    cursor:pointer;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    font-family:'Cormorant Garamond',Georgia,serif;
+    font-weight:300;
+    font-style:italic;
+    letter-spacing:0.8px;
+    border:none;
+    border-radius:0;
+    transition:background 0.18s, color 0.18s, opacity 0.18s;
+    text-align:right;
 }
-.model-option:hover{background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);}
+.model-option:hover{
+    background:linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.03) 55%, rgba(255,255,255,0.07) 100%);
+    color:rgba(255,255,255,0.9);
+}
+.model-option.active{
+    background:linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.04) 48%, rgba(255,255,255,0.1) 100%);
+    color:rgba(255,255,255,0.96);
+}
+.model-option.active::after{
+    content:'';
+    position:absolute;
+    top:5px;
+    bottom:5px;
+    right:0;
+    width:1px;
+    background:rgba(255,255,255,0.22);
+}
 .msgWrap{margin-bottom:4px;}
 .msgWrap.adminDeletable{cursor:pointer;}
 .msgWrap.adminDeletable:hover{outline:1px dashed rgba(255,255,255,0.18);}
@@ -101,6 +162,7 @@ body{
     #adminControls{gap:4px;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;}
     #adminControls::-webkit-scrollbar{display:none;}
     #adminControls select,#adminControls button{font-size:10px;padding:2px 4px;height:22px;}
+    #modelDropdown{max-width:92vw;}
 }
 ::-webkit-scrollbar{width:8px}
 ::-webkit-scrollbar-track{background:rgb(16,32,60)}
@@ -232,8 +294,9 @@ function renderModelDock() {
   modelCurrent.classList.add('admin-clickable');
 
   for (const m of models) {
+    const isActive = m.provider === currentModel.provider && m.model === currentModel.model;
     const el = document.createElement('div');
-    el.className = 'model-option';
+    el.className = 'model-option' + (isActive ? ' active' : '');
     el.textContent = m.name;
     el.onclick = async (e) => {
       e.stopPropagation();
@@ -417,7 +480,13 @@ refreshBtn.onclick = () => location.reload();
 modelCurrent.onclick = (e) => {
   e.stopPropagation();
   if (!adminMode) return;
-  modelDropdown.style.display = modelDropdown.style.display === 'block' ? 'none' : 'block';
+  const willOpen = modelDropdown.style.display !== 'block';
+  if (willOpen) {
+    modelDropdown.style.display = 'block';
+    modelDropdown.scrollTop = 0;  // прокрутка к верху
+  } else {
+    modelDropdown.style.display = 'none';
+  }
 };
 
 document.addEventListener('click', () => {
