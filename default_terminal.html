@@ -155,17 +155,18 @@ body{
     cursor:pointer;
 }
 
+/* ИСПРАВЛЕНИЕ: теперь список открывается ВНИЗ, а не вверх */
 #modelDropdown{
     display:none;
     position:absolute;
-    bottom: calc(100% + 12px);  /* ← сдвинули вниз, чтобы верхний элемент не уходил за экран */
+    top: 100%;           /* привязываем к нижнему краю родителя */
     right:0;
     background:transparent;
     backdrop-filter:blur(4px);
-    padding:0 0 4px 0;
+    padding: 4px 0;
     z-index:40;
     white-space:nowrap;
-    max-height:calc(100vh - 8px);
+    max-height: 70vh;    /* чтобы влезал в экран, остальное скролл */
     overflow-y:auto;
     border:none;
     width:fit-content;
