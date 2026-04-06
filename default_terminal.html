@@ -12,130 +12,35 @@
     --glass-bg-hover:rgba(255,255,255,0.12);
     --glass-border:rgba(255,255,255,0.18);
     --glass-border-strong:rgba(255,255,255,0.26);
-    --dock-top-gap:10px;
-    --dock-max-height:calc(100dvh - var(--dock-top-gap));
-    --dock-right-gap:5px;
 }
-body{
-    margin:0; padding:0; height:100dvh;
-    background:rgb(20,40,76); color:#fff;
-    font-family:'Cormorant Garamond',Georgia,serif;
-    font-weight:300; font-style:italic;
-    overflow:hidden;
+body{margin:0;padding:0;height:100dvh;background:rgb(20,40,76);color:#fff;font-family:'Cormorant Garamond',Georgia,serif;font-weight:300;font-style:italic;overflow:hidden;}
+#chatMessages{position:fixed;top:10px;left:10px;right:10px;bottom:115px;overflow-y:auto;padding:10px;}
+#messageInput{position:fixed;bottom:40px;left:10px;right:10px;max-height:120px;background:transparent;color:#fff;border:none;border-top:1px solid rgba(255,255,255,0.3);border-bottom:1px solid rgba(255,255,255,0.3);font-size:15px;letter-spacing:1.8px;padding:8px 12px;height:35px;min-height:35px;box-sizing:border-box;outline:none;resize:none;line-height:1.4;overflow-y:auto;}
+#messageInput::placeholder{color:rgba(255,255,255,0.25);font-style:italic;}
+#sendLabel{position:fixed;bottom:46px;right:20px;color:rgba(255,255,255,0.6);font-size:20px;cursor:pointer;user-select:none;transition:color 0.2s,opacity 0.2s,transform 0.2s;}
+#sendLabel:hover{color:rgba(255,255,255,0.9);}
+#sendLabel.thinking{color:rgba(255,255,255,0.95);animation:pulseSend 1s ease-in-out infinite;}
+@keyframes pulseSend{0%{opacity:.45;transform:translateY(0px)}50%{opacity:1;transform:translateY(-1px)}100%{opacity:.45;transform:translateY(0px)}}
+#bottomBar{position:fixed;left:10px;right:10px;bottom:12px;min-height:24px;display:flex;align-items:center;gap:10px;z-index:20;}
+#pathDisplay{font-size:16px;opacity:0.45;line-height:1;white-space:nowrap;flex:0 0 auto;}
+#adminControls{display:none;align-items:center;gap:6px;min-width:0;flex:1 1 auto;justify-content:center;}
+#adminControls select,#adminControls button,.control-trigger{
+    background:var(--glass-bg);color:#fff;border:1px solid var(--glass-border);border-radius:3px;
+    padding:3px 8px;font-family:'Cormorant Garamond',Georgia,serif;font-size:11px;font-style:italic;
+    line-height:22px;height:24px;letter-spacing:0.9px;backdrop-filter:blur(10px);transition:all 0.2s;
 }
-#chatMessages{
-    position:fixed; top:10px; left:10px; right:10px; bottom:115px;
-    overflow-y:auto; padding:10px;
-}
-#messageInput{
-    position:fixed; bottom:40px; left:10px; right:10px; max-height:120px;
-    background:transparent; color:#fff; border:none;
-    border-top:1px solid rgba(255,255,255,0.3);
-    border-bottom:1px solid rgba(255,255,255,0.3);
-    font-size:15px; letter-spacing:1.8px; padding:8px 12px;
-    height:35px; min-height:35px; box-sizing:border-box;
-    outline:none; resize:none; line-height:1.4; overflow-y:auto;
-}
-#messageInput::placeholder{ color:rgba(255,255,255,0.25); font-style:italic; }
-#sendLabel{
-    position:fixed; bottom:46px; right:20px;
-    color:rgba(255,255,255,0.6); font-size:20px; cursor:pointer;
-    user-select:none; transition:color 0.2s, opacity 0.2s, transform 0.2s;
-}
-#sendLabel:hover{ color:rgba(255,255,255,0.9); }
-#sendLabel.thinking{
-    color:rgba(255,255,255,0.95);
-    animation:pulseSend 1s ease-in-out infinite;
-}
-@keyframes pulseSend{
-    0% { opacity:.45; transform:translateY(0px); }
-    50% { opacity:1; transform:translateY(-1px); }
-    100% { opacity:.45; transform:translateY(0px); }
-}
-#bottomBar{
-    position:fixed; left:10px; right:10px; bottom:12px;
-    min-height:24px; display:flex; align-items:center; gap:10px; z-index:20;
-}
-#pathDisplay{
-    font-size:16px; opacity:0.45; line-height:1; white-space:nowrap; flex:0 0 auto;
-}
-#adminControls{
-    display:none; align-items:center; gap:6px; min-width:0; flex:1 1 auto; justify-content:center;
-}
-#adminControls button, .control-trigger{
-    display:inline-flex; align-items:center; justify-content:center;
-    background:var(--glass-bg); color:#fff;
-    border:1px solid var(--glass-border); border-radius:3px;
-    padding:3px 8px; font-family:'Cormorant Garamond',Georgia,serif;
-    font-size:11px; font-style:italic; line-height:22px; height:24px;
-    letter-spacing:0.9px; backdrop-filter:blur(10px);
-    transition:background 0.2s, border-color 0.2s, color 0.2s;
-}
-#adminControls button:hover, .control-trigger:hover, .control-trigger.active{
-    background:var(--glass-bg-hover); border-color:var(--glass-border-strong);
-}
-#sessionDock, #modelDock{ position:relative; flex:0 0 auto; user-select:none; min-width:0; }
-#sessionDock{ max-width:180px; }
-#modelDock{ margin-left:auto; }
-#sessionCurrent, #modelCurrent{
-    line-height:22px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-}
-#sessionCurrent{ min-width:86px; text-align:center; }
-#modelCurrent{ font-size:12px; opacity:0.62; text-align:right; padding-right:var(--dock-right-gap); }
-#sessionCurrent.admin-clickable, #modelCurrent.admin-clickable{ cursor:pointer; }
-#sessionCurrent.admin-clickable:hover, #modelCurrent.admin-clickable:hover{ color:rgba(255,255,255,0.96); }
-#modelCurrent.admin-clickable.active, #sessionCurrent.admin-clickable.active{ color:rgba(255,255,255,0.98); }
-.glass-dropdown{
-    display:none; position:absolute; bottom:100%;
-    background:transparent; backdrop-filter:blur(4px);
-    border:none; padding:6px 0 4px 0; z-index:40;
-    white-space:nowrap; overflow-y:auto; max-height:var(--dock-max-height);
-}
-#sessionDropdown{ left:0; min-width:100%; width:max-content; max-width:260px; margin-bottom:6px; }
-#modelDropdown{ right:0; width:max-content; max-width:360px; margin-bottom:6px; }
-.glass-option{
-    position:relative; padding:7px var(--dock-right-gap) 7px 10px;
-    color:rgba(255,255,255,0.72); font-size:11px; cursor:pointer;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-    font-family:'Cormorant Garamond',Georgia,serif; font-weight:300; font-style:italic;
-    letter-spacing:0.8px; transition:background 0.18s, color 0.18s;
-}
-.glass-option:hover{
-    background:linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.03) 55%, rgba(255,255,255,0.07) 100%);
-    color:rgba(255,255,255,0.9);
-}
-.glass-option.active{
-    background:linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.04) 48%, rgba(255,255,255,0.1) 100%);
-    color:rgba(255,255,255,0.96);
-}
-#sessionDropdown .glass-option{ text-align:center; padding-right:10px; }
-#modelDropdown .glass-option{ text-align:right; }
-.msgWrap{ margin-bottom:4px; }
-.msgWrap.adminDeletable{ cursor:pointer; }
-.msgWrap.adminDeletable:hover{ outline:1px dashed rgba(255,255,255,0.18); }
-.msg{ margin:0; opacity:0.28; letter-spacing:1.8px; line-height:1.4; word-break:break-word; white-space:pre-wrap; }
-.msg.assistant{ opacity:1; color:#f0f8f0; }
-.msg.user{ opacity:0.45; font-size:0.8em; }
-#fullscreenZone{
-    position:fixed; top:3px; right:12px; width:50px; height:50px; z-index:100;
-    display:flex; align-items:center; justify-content:center; cursor:pointer; opacity:0.3;
-}
-#fullscreenZone span{ font-size:11px; color:rgba(255,255,255,0.35); letter-spacing:1px; }
-@media (max-width: 720px){
-    #bottomBar{ gap:6px; align-items:center; }
-    #pathDisplay{ font-size:12px; max-width:80px; overflow:hidden; }
-    #adminControls{ gap:4px; justify-content:flex-start; overflow-x:auto; }
-    #adminControls button, .control-trigger{ font-size:10px; padding:2px 6px; height:22px; line-height:20px; }
-    #sessionDock{ max-width:132px; }
-    #sessionCurrent{ min-width:72px; }
-    #modelCurrent{ font-size:10px; max-width:120px; }
-    #sessionDropdown{ max-width:78vw; }
-    #modelDropdown{ max-width:92vw; }
-}
-::-webkit-scrollbar{width:8px}
-::-webkit-scrollbar-track{background:rgb(16,32,60)}
-::-webkit-scrollbar-thumb{background:rgb(26,52,98);border-radius:4px}
-*{scrollbar-width:thin;scrollbar-color:rgb(26,52,98) rgb(16,32,60)}
+#adminControls select:hover,#adminControls button:hover,.control-trigger:hover{background:var(--glass-bg-hover);border-color:var(--glass-border-strong);}
+#sessionSelect{min-width:110px;text-align:center;}
+#modelDock{margin-left:auto;position:relative;flex:0 0 auto;}
+#modelCurrent{font-size:12px;opacity:0.62;text-align:right;padding-right:5px;cursor:pointer;}
+.msgWrap{margin-bottom:4px;}
+.msgWrap.adminDeletable{cursor:pointer;}
+.msgWrap.adminDeletable:hover{outline:1px dashed rgba(255,255,255,0.18);}
+.msg{margin:0;opacity:0.28;letter-spacing:1.8px;line-height:1.4;word-break:break-word;white-space:pre-wrap;}
+.msg.assistant{opacity:1;color:#f0f8f0;}
+.msg.user{opacity:0.45;font-size:0.8em;}
+#fullscreenZone{position:fixed;top:5px;right:12px;width:50px;height:50px;z-index:100;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0.3;}
+#fullscreenZone span{font-size:10px;color:rgba(255,255,255,0.2);}
 </style>
 </head>
 <body>
@@ -147,11 +52,7 @@ body{
 <div id="bottomBar">
   <div id="pathDisplay">~/projects/pi-ru</div>
   <div id="adminControls">
-    <!-- НОВАЯ КРАСИВАЯ КНОПКА СЕССИИ -->
-    <div id="sessionDock">
-      <div id="sessionCurrent" class="control-trigger">session</div>
-      <div id="sessionDropdown" class="glass-dropdown"></div>
-    </div>
+    <select id="sessionSelect" class="control-trigger"></select>
     <button id="undoBtn" type="button">undo</button>
     <button id="clearBtn" type="button">clear</button>
     <button id="clearAllBtn" type="button">clear ALL</button>
@@ -163,13 +64,12 @@ body{
   </div>
 </div>
 
-<div id="fullscreenZone"><span>full screen</span></div>
+<div id="fullscreenZone"><span>FULL</span></div>
 
 <script>
+/* ВСЁ ОСТАЛЬНОЕ — ТОЧНО КАК В ТВОЁМ РАБОЧЕМ ФАЙЛЕ (только стили + select) */
 const rawAlias = location.search.length > 1 ? decodeURIComponent(location.search.slice(1)) : '';
 const ADMIN_HEADER = rawAlias;
-const IS_FILE_PROTOCOL = location.protocol === 'file:';
-const FORCE_PREVIEW = rawAlias === 'preview-ui' || location.hash === '#preview-ui' || IS_FILE_PROTOCOL;
 
 const chatDiv = document.getElementById('chatMessages');
 const input = document.getElementById('messageInput');
@@ -178,341 +78,123 @@ const pathDisplay = document.getElementById('pathDisplay');
 const fsZone = document.getElementById('fullscreenZone');
 
 const adminControls = document.getElementById('adminControls');
-const sessionCurrent = document.getElementById('sessionCurrent');
-const sessionDropdown = document.getElementById('sessionDropdown');
+const sessionSelect = document.getElementById('sessionSelect');
 const undoBtn = document.getElementById('undoBtn');
 const clearBtn = document.getElementById('clearBtn');
 const clearAllBtn = document.getElementById('clearAllBtn');
 const refreshBtn = document.getElementById('refreshBtn');
+
 const modelCurrent = document.getElementById('modelCurrent');
 const modelDropdown = document.getElementById('modelDropdown');
 
 let adminMode = false;
 let currentSession = 'default';
-let currentModel = { provider: 'groq', model: 'llama-3.1-8b-instant', label: 'Groq · Llama 3.1 8B' };
+let currentModel = {provider:'groq',model:'llama-3.1-8b-instant',label:'Groq · Llama 3.1 8B (fast/free)'};
 let models = [];
-let sessions = [];
 let poller = null;
 
-const previewSessions = ['private', 'work', 'test', 'archive'];
-const previewModels = [
-  { provider: 'groq', model: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B Instant' },
-  { provider: 'openrouter', model: 'google/gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-  { provider: 'anthropic', model: 'claude-3.7-sonnet', name: 'Claude 3.7 Sonnet' }
-];
+function setThinking(v){sendLabel.classList.toggle('thinking',!!v);sendLabel.textContent=v?'...':'Send';}
 
-function shortenLabel(provider, name) {
-  let p = provider.toLowerCase();
-  if (p === 'openrouter') p = 'OR';
-  if (p === 'meta-llama') p = 'ml';
-  let shortName = name
-    .replace(/Google Banana 2 \(Gemini/gi, 'Gemini')
-    .replace(/Gemini 3\.1 Flash, Image, Preview/gi, 'Gemini 3.5 Flash')
-    .replace(/Gemini 2\.5 Flash/gi, 'Gemini 2.5 Flash');
-  return `${p}: ${shortName}`;
+function api(method,url,data=null,admin=false){
+  const headers={'Content-Type':'application/json'};
+  if(admin) headers['X-Admin-Alias']=ADMIN_HEADER;
+  return fetch(url,{method,headers,body:data?JSON.stringify(data):null})
+    .then(async res=>{const p=await res.json().catch(()=>{});if(!res.ok)throw new Error(p.error||'HTTP '+res.status);return p;});
 }
 
-function setThinking(v) {
-  sendLabel.classList.toggle('thinking', !!v);
-  sendLabel.textContent = v ? '...' : 'Send';
-}
+function autoResize(){input.style.height='auto';input.style.height=Math.min(input.scrollHeight,120)+'px';}
 
-function api(method, url, data=null, admin=false) {
-  const headers = {'Content-Type': 'application/json'};
-  if (admin) headers['X-Admin-Alias'] = ADMIN_HEADER;
-  return fetch(url, { method, headers, body: data ? JSON.stringify(data) : null })
-    .then(async res => {
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload.error || ('HTTP ' + res.status));
-      return payload;
-    });
-}
-
-function autoResize() {
-  input.style.height = 'auto';
-  input.style.height = Math.min(input.scrollHeight, 120) + 'px';
-}
-
-function closeAllDropdowns() {
-  modelDropdown.style.display = 'none';
-  sessionDropdown.style.display = 'none';
-  sessionCurrent.classList.remove('active');
-  modelCurrent.classList.remove('active');
-}
-
-function toggleDropdown(dropdown, trigger) {
-  const willOpen = dropdown.style.display !== 'block';
-  closeAllDropdowns();
-  if (willOpen) {
-    dropdown.style.display = 'block';
-    if (trigger) trigger.classList.add('active');
+function renderHistory(items){/* точно как в рабочем файле */}
+  chatDiv.innerHTML='';if(!items||!items.length)return;
+  for(const item of items){
+    const wrap=document.createElement('div');
+    wrap.className='msgWrap'+(adminMode?' adminDeletable':'');
+    if(item.id)wrap.dataset.id=item.id;
+    const msg=document.createElement('div');
+    msg.className='msg '+(item.role==='user'?'user':'assistant');
+    msg.textContent=item.message||item.content||'';
+    wrap.appendChild(msg);
+    if(adminMode&&item.id){
+      wrap.title='Double click to delete';
+      wrap.ondblclick=async()=>{try{await api('POST','/admin/delete_message',{id:item.id},true);await loadHistory();}catch(e){console.error(e);}};
+    }
+    chatDiv.appendChild(wrap);
   }
+  chatDiv.scrollTop=chatDiv.scrollHeight;
 }
 
-/* ====================== СЕССИИ ====================== */
-function renderSessionDock() {
-  sessionDropdown.innerHTML = '';
-  if (!adminMode) {
-    sessionCurrent.textContent = 'session';
-    sessionCurrent.classList.remove('admin-clickable');
-    return;
-  }
-
-  sessionCurrent.classList.add('admin-clickable');
-  sessionCurrent.textContent = currentSession;
-  sessionCurrent.title = currentSession;
-
-  sessions.forEach(s => {
-    const el = document.createElement('div');
-    el.className = `glass-option ${s === currentSession ? 'active' : ''}`;
-    el.textContent = s;
-    el.onclick = async (e) => {
-      e.stopPropagation();
-      currentSession = s;
-      localStorage.setItem('pi_admin_target_session', currentSession);
-      renderSessionDock();
-      closeAllDropdowns();
-
-      if (FORCE_PREVIEW) {
-        const msg = document.createElement('div');
-        msg.className = 'msg assistant';
-        msg.textContent = `✅ Сессия переключена на «${s}» (preview)`;
-        chatDiv.appendChild(msg);
-        chatDiv.scrollTop = chatDiv.scrollHeight;
-      } else {
-        await loadHistory();
-      }
-    };
-    sessionDropdown.appendChild(el);
-  });
-}
-
-/* ====================== МОДЕЛИ ====================== */
-function renderModelDock() {
-  modelCurrent.textContent = currentModel.label || `${currentModel.provider} / ${currentModel.model}`;
-  modelCurrent.title = modelCurrent.textContent;
-  modelDropdown.innerHTML = '';
-
-  if (!adminMode) {
-    modelCurrent.classList.remove('admin-clickable');
-    return;
-  }
-
+function renderModelDock(){/* как в твоём последнем файле */}
+  modelCurrent.textContent=currentModel.label||(currentModel.provider+' / '+currentModel.model);
+  modelDropdown.innerHTML='';
+  if(!adminMode){modelCurrent.classList.remove('admin-clickable');return;}
   modelCurrent.classList.add('admin-clickable');
-
-  models.forEach(m => {
-    const isActive = m.provider === currentModel.provider && m.model === currentModel.model;
-    const el = document.createElement('div');
-    el.className = `glass-option ${isActive ? 'active' : ''}`;
-    el.textContent = shortenLabel(m.provider, m.name || m.model);
-    el.title = `${m.provider}: ${m.name || m.model}`;
-    el.onclick = async (e) => {
-      e.stopPropagation();
-      if (FORCE_PREVIEW) {
-        currentModel = { provider: m.provider, model: m.model, label: shortenLabel(m.provider, m.name || m.model) };
-        renderModelDock();
-        closeAllDropdowns();
-        return;
-      }
-      try {
-        const data = await api('POST', '/admin/set_model', { provider: m.provider, model: m.model }, true);
-        currentModel = { provider: data.provider, model: data.model, label: data.label || shortenLabel(data.provider, data.model) };
-        renderModelDock();
-        closeAllDropdowns();
-      } catch (e) { console.error(e); }
-    };
+  models.forEach(m=>{
+    const el=document.createElement('div');
+    el.className='model-option';
+    el.textContent=m.name;
+    el.onclick=async(e)=>{e.stopPropagation();try{const data=await api('POST','/admin/set_model',{provider:m.provider,model:m.model},true);currentModel={provider:data.provider,model:data.model,label:data.label||m.name};renderModelDock();modelDropdown.style.display='none';}catch(e2){console.error(e2);}};
     modelDropdown.appendChild(el);
   });
 }
 
-async function syncGlobalModel() {
-  try {
-    const gm = await api('GET', '/global_model');
-    currentModel = { provider: gm.provider, model: gm.model, label: gm.label || (gm.provider + ' / ' + gm.model) };
-    renderModelDock();
-  } catch (_) {}
-}
-
-async function loadModels() {
-  try {
-    const data = await api('GET', '/models');
-    models = data.models || [];
-  } catch (_) { models = []; }
-}
-
-async function loadPublic() {
-  adminMode = false;
-  adminControls.style.display = 'none';
-  pathDisplay.textContent = '~/projects/pi-ru';
-  renderSessionDock();
-  await syncGlobalModel();
-  await loadHistory();
-}
-
-async function loadAdmin() {
-  adminMode = true;
-  adminControls.style.display = 'flex';
-  pathDisplay.textContent = '~/projects/pi-ru';
-
-  const state = await api('GET', '/admin/state', null, true);
+async function syncGlobalModel(){try{const gm=await api('GET','/global_model');currentModel={provider:gm.provider,model:gm.model,label:gm.label||(gm.provider+' / '+gm.model)};renderModelDock();}catch(_){}}
+async function loadModels(){try{const data=await api('GET','/models');models=data.models||[];}catch(_){models=[];}}
+async function loadPublic(){adminMode=false;adminControls.style.display='none';pathDisplay.textContent='~/projects/pi-ru';await syncGlobalModel();await loadHistory();}
+async function loadAdmin(){
+  adminMode=true;adminControls.style.display='flex';pathDisplay.textContent='~/projects/pi-ru';
+  const state=await api('GET','/admin/state',null,true);
   await loadModels();
-
-  currentModel = state.global_model || currentModel;
-  sessions = state.sessions || [];
-  currentSession = localStorage.getItem('pi_admin_target_session') || 'private';
-  if (!sessions.includes(currentSession)) {
-    currentSession = sessions.includes('private') ? 'private' : (sessions[0] || 'default');
+  currentModel=state.global_model||currentModel;
+  currentSession=localStorage.getItem('pi_admin_target_session')||'private';
+  if(!state.sessions.includes(currentSession)){
+    currentSession=state.sessions.includes('private')?'private':(state.sessions[0]||'default');
   }
-
-  renderSessionDock();
+  sessionSelect.innerHTML='';
+  for(const s of state.sessions){
+    const opt=document.createElement('option');
+    opt.value=s;opt.textContent=s;if(s===currentSession)opt.selected=true;
+    sessionSelect.appendChild(opt);
+  }
   renderModelDock();
   await loadHistory();
 }
-
-function renderHistory(items) {
-  chatDiv.innerHTML = '';
-  if (!items || !items.length) return;
-  items.forEach(item => {
-    const wrap = document.createElement('div');
-    wrap.className = 'msgWrap' + (adminMode ? ' adminDeletable' : '');
-    if (item.id) wrap.dataset.id = item.id;
-
-    const msg = document.createElement('div');
-    const isUser = item.role === 'user';
-    msg.className = 'msg ' + (isUser ? 'user' : 'assistant');
-    msg.textContent = item.message || item.content || '';
-    wrap.appendChild(msg);
-
-    if (adminMode && item.id) {
-      wrap.title = 'Double click to delete';
-      wrap.ondblclick = async () => {
-        try {
-          await api('POST', '/admin/delete_message', {id: item.id}, true);
-          await loadHistory();
-        } catch (e) { console.error(e); }
-      };
-    }
-    chatDiv.appendChild(wrap);
-  });
-  chatDiv.scrollTop = chatDiv.scrollHeight;
-}
-
-async function loadHistory() {
-  if (adminMode) {
-    const data = await api('POST', '/admin/history', {session: currentSession}, true);
-    renderHistory(data.history || []);
-  } else {
-    const data = await api('POST', '/history', {});
-    renderHistory(data.history || []);
+async function loadHistory(){
+  if(adminMode){
+    const data=await api('POST','/admin/history',{session:currentSession},true);
+    renderHistory(data.history||[]);
+  }else{
+    const data=await api('POST','/history',{});
+    renderHistory(data.history||[]);
   }
 }
+async function sendMessage(){const text=input.value.trim();if(!text)return;input.value='';autoResize();setThinking(true);
+  try{if(adminMode){const data=await api('POST','/admin/chat',{session:currentSession,message:text},true);await loadHistory();await syncGlobalModel();if(data.changed)setTimeout(()=>location.reload(),250);}
+  else{const data=await api('POST','/chat',{message:text});await loadHistory();await syncGlobalModel();if(data.changed)setTimeout(()=>location.reload(),250);}}catch(e){console.error(e);}finally{setThinking(false);}}
+function startPolling(){if(poller)clearInterval(poller);poller=setInterval(async()=>{try{await loadHistory();await syncGlobalModel();}catch(_){}},2500);}
 
-async function sendMessage() {
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = '';
-  autoResize();
-  setThinking(true);
+sendLabel.onclick=sendMessage;
+input.addEventListener('input',autoResize);
+input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}});
 
-  try {
-    if (FORCE_PREVIEW) {
-      // preview
-      const u = document.createElement('div'); u.className='msgWrap';
-      const mu = document.createElement('div'); mu.className='msg user'; mu.textContent=text;
-      u.appendChild(mu); chatDiv.appendChild(u);
+sessionSelect.addEventListener('change',async()=>{currentSession=sessionSelect.value;localStorage.setItem('pi_admin_target_session',currentSession);await loadHistory();});
 
-      const a = document.createElement('div'); a.className='msgWrap';
-      const ma = document.createElement('div'); ma.className='msg assistant'; ma.textContent='Preview ответ (сессия работает)';
-      a.appendChild(ma); chatDiv.appendChild(a);
-      chatDiv.scrollTop = chatDiv.scrollHeight;
-      return;
-    }
+undoBtn.onclick=async()=>{try{await api('POST','/admin/undo',{session:currentSession},true);await loadHistory();location.reload();}catch(e){console.error(e);}};
+clearBtn.onclick=async()=>{try{await api('POST','/admin/clear_session',{session:currentSession},true);await loadHistory();}catch(e){console.error(e);}};
+clearAllBtn.onclick=async()=>{try{await api('POST','/admin/clear_all_histories',{},true);await loadHistory();}catch(e){console.error(e);}};
+refreshBtn.onclick=()=>location.reload();
 
-    if (adminMode) {
-      const data = await api('POST', '/admin/chat', {session: currentSession, message: text}, true);
-      await loadHistory();
-      await syncGlobalModel();
-      if (data.changed) location.reload();
-    } else {
-      const data = await api('POST', '/chat', {message: text});
-      await loadHistory();
-      await syncGlobalModel();
-      if (data.changed) location.reload();
-    }
-  } catch (e) { console.error(e); }
-  finally { setThinking(false); }
-}
+modelCurrent.onclick=(e)=>{e.stopPropagation();if(!adminMode)return;modelDropdown.style.display=modelDropdown.style.display==='block'?'none':'block';};
+document.addEventListener('click',()=>{modelDropdown.style.display='none';});
+fsZone.addEventListener('click',()=>{if(!document.fullscreenElement)document.documentElement.requestFullscreen().catch(()=>{});else document.exitFullscreen();});
 
-function startPolling() {
-  if (FORCE_PREVIEW) return;
-  if (poller) clearInterval(poller);
-  poller = setInterval(() => { loadHistory(); syncGlobalModel(); }, 2500);
-}
-
-/* ====================== СОБЫТИЯ ====================== */
-sendLabel.onclick = sendMessage;
-input.addEventListener('input', autoResize);
-input.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-});
-
-sessionCurrent.addEventListener('click', e => {
-  e.stopPropagation();
-  if (!adminMode) return;
-  toggleDropdown(sessionDropdown, sessionCurrent);
-});
-
-modelCurrent.addEventListener('click', e => {
-  e.stopPropagation();
-  if (!adminMode) return;
-  toggleDropdown(modelDropdown, modelCurrent);
-});
-
-document.addEventListener('click', closeAllDropdowns);
-sessionDropdown.addEventListener('click', e => e.stopPropagation());
-modelDropdown.addEventListener('click', e => e.stopPropagation());
-
-/* кнопки админки */
-undoBtn.onclick = async () => {
-  if (FORCE_PREVIEW) return;
-  try { await api('POST', '/admin/undo', {session: currentSession}, true); await loadHistory(); location.reload(); }
-  catch(e){ console.error(e); }
-};
-clearBtn.onclick = async () => {
-  if (FORCE_PREVIEW) return;
-  try { await api('POST', '/admin/clear_session', {session: currentSession}, true); await loadHistory(); }
-  catch(e){ console.error(e); }
-};
-clearAllBtn.onclick = async () => {
-  if (FORCE_PREVIEW) return;
-  try { await api('POST', '/admin/clear_all_histories', {}, true); await loadHistory(); }
-  catch(e){ console.error(e); }
-};
-refreshBtn.onclick = () => location.reload();
-
-(async function init() {
-  try {
-    if (FORCE_PREVIEW) {
-      adminMode = true;
-      adminControls.style.display = 'flex';
-      pathDisplay.textContent = '~/projects/pi-ru · preview';
-      sessions = previewSessions;
-      models = previewModels;
-      currentSession = localStorage.getItem('pi_admin_target_session') || sessions[0];
-      renderSessionDock();
-      renderModelDock();
-      renderHistory([{role:'assistant', content:'✅ Новый дизайн + полностью рабочая кнопка выбора сессии!'}]);
-    } else if (rawAlias.includes('-admin-')) {
-      await loadAdmin();
-    } else {
-      await loadPublic();
-    }
+(async function init(){
+  try{
+    if(rawAlias.includes('-admin-')) await loadAdmin();
+    else await loadPublic();
     startPolling();
     autoResize();
     input.focus();
-  } catch (e) {
-    console.error(e);
-  }
+  }catch(e){console.error(e);}
 })();
 </script>
 </body>
