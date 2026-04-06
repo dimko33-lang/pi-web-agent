@@ -147,6 +147,7 @@ body{
 <div id="bottomBar">
   <div id="pathDisplay">~/projects/pi-ru</div>
   <div id="adminControls">
+    <!-- НОВАЯ КРАСИВАЯ КНОПКА СЕССИИ -->
     <div id="sessionDock">
       <div id="sessionCurrent" class="control-trigger">session</div>
       <div id="sessionDropdown" class="glass-dropdown"></div>
@@ -219,15 +220,12 @@ function setThinking(v) {
 function api(method, url, data=null, admin=false) {
   const headers = {'Content-Type': 'application/json'};
   if (admin) headers['X-Admin-Alias'] = ADMIN_HEADER;
-  return fetch(url, {
-    method,
-    headers,
-    body: data ? JSON.stringify(data) : null
-  }).then(async (res) => {
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(payload.error || ('HTTP ' + res.status));
-    return payload;
-  });
+  return fetch(url, { method, headers, body: data ? JSON.stringify(data) : null })
+    .then(async res => {
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error || ('HTTP ' + res.status));
+      return payload;
+    });
 }
 
 function autoResize() {
@@ -248,10 +246,10 @@ function toggleDropdown(dropdown, trigger) {
   if (willOpen) {
     dropdown.style.display = 'block';
     if (trigger) trigger.classList.add('active');
-    if (dropdown === modelDropdown) dropdown.scrollTop = 0;
   }
 }
 
+/* ====================== СЕССИИ ====================== */
 function renderSessionDock() {
   sessionDropdown.innerHTML = '';
   if (!adminMode) {
@@ -259,13 +257,14 @@ function renderSessionDock() {
     sessionCurrent.classList.remove('admin-clickable');
     return;
   }
+
   sessionCurrent.classList.add('admin-clickable');
   sessionCurrent.textContent = currentSession;
   sessionCurrent.title = currentSession;
 
-  for (const s of sessions) {
+  sessions.forEach(s => {
     const el = document.createElement('div');
-    el.className = 'glass-option' + (s === currentSession ? ' active' : '');
+    el.className = `glass-option ${s === currentSession ? 'active' : ''}`;
     el.textContent = s;
     el.onclick = async (e) => {
       e.stopPropagation();
@@ -273,10 +272,11 @@ function renderSessionDock() {
       localStorage.setItem('pi_admin_target_session', currentSession);
       renderSessionDock();
       closeAllDropdowns();
+
       if (FORCE_PREVIEW) {
         const msg = document.createElement('div');
         msg.className = 'msg assistant';
-        msg.textContent = `Сессия изменена на «${s}» (preview)`;
+        msg.textContent = `✅ Сессия переключена на «${s}» (preview)`;
         chatDiv.appendChild(msg);
         chatDiv.scrollTop = chatDiv.scrollHeight;
       } else {
@@ -284,22 +284,26 @@ function renderSessionDock() {
       }
     };
     sessionDropdown.appendChild(el);
-  }
+  });
 }
 
+/* ====================== МОДЕЛИ ====================== */
 function renderModelDock() {
-  modelCurrent.textContent = currentModel.label || (currentModel.provider + ' / ' + currentModel.model);
+  modelCurrent.textContent = currentModel.label || `${currentModel.provider} / ${currentModel.model}`;
   modelCurrent.title = modelCurrent.textContent;
   modelDropdown.innerHTML = '';
+
   if (!adminMode) {
     modelCurrent.classList.remove('admin-clickable');
     return;
   }
+
   modelCurrent.classList.add('admin-clickable');
-  for (const m of models) {
+
+  models.forEach(m => {
     const isActive = m.provider === currentModel.provider && m.model === currentModel.model;
     const el = document.createElement('div');
-    el.className = 'glass-option' + (isActive ? ' active' : '');
+    el.className = `glass-option ${isActive ? 'active' : ''}`;
     el.textContent = shortenLabel(m.provider, m.name || m.model);
     el.title = `${m.provider}: ${m.name || m.model}`;
     el.onclick = async (e) => {
@@ -308,11 +312,6 @@ function renderModelDock() {
         currentModel = { provider: m.provider, model: m.model, label: shortenLabel(m.provider, m.name || m.model) };
         renderModelDock();
         closeAllDropdowns();
-        const msg = document.createElement('div');
-        msg.className = 'msg assistant';
-        msg.textContent = `Модель изменена на ${currentModel.label} (preview)`;
-        chatDiv.appendChild(msg);
-        chatDiv.scrollTop = chatDiv.scrollHeight;
         return;
       }
       try {
@@ -323,7 +322,7 @@ function renderModelDock() {
       } catch (e) { console.error(e); }
     };
     modelDropdown.appendChild(el);
-  }
+  });
 }
 
 async function syncGlobalModel() {
@@ -357,15 +356,45 @@ async function loadAdmin() {
 
   const state = await api('GET', '/admin/state', null, true);
   await loadModels();
+
   currentModel = state.global_model || currentModel;
   sessions = state.sessions || [];
   currentSession = localStorage.getItem('pi_admin_target_session') || 'private';
   if (!sessions.includes(currentSession)) {
     currentSession = sessions.includes('private') ? 'private' : (sessions[0] || 'default');
   }
+
   renderSessionDock();
   renderModelDock();
   await loadHistory();
+}
+
+function renderHistory(items) {
+  chatDiv.innerHTML = '';
+  if (!items || !items.length) return;
+  items.forEach(item => {
+    const wrap = document.createElement('div');
+    wrap.className = 'msgWrap' + (adminMode ? ' adminDeletable' : '');
+    if (item.id) wrap.dataset.id = item.id;
+
+    const msg = document.createElement('div');
+    const isUser = item.role === 'user';
+    msg.className = 'msg ' + (isUser ? 'user' : 'assistant');
+    msg.textContent = item.message || item.content || '';
+    wrap.appendChild(msg);
+
+    if (adminMode && item.id) {
+      wrap.title = 'Double click to delete';
+      wrap.ondblclick = async () => {
+        try {
+          await api('POST', '/admin/delete_message', {id: item.id}, true);
+          await loadHistory();
+        } catch (e) { console.error(e); }
+      };
+    }
+    chatDiv.appendChild(wrap);
+  });
+  chatDiv.scrollTop = chatDiv.scrollHeight;
 }
 
 async function loadHistory() {
@@ -378,32 +407,6 @@ async function loadHistory() {
   }
 }
 
-function renderHistory(items) {
-  chatDiv.innerHTML = '';
-  if (!items || !items.length) return;
-  for (const item of items) {
-    const wrap = document.createElement('div');
-    wrap.className = 'msgWrap' + (adminMode ? ' adminDeletable' : '');
-    if (item.id) wrap.dataset.id = item.id;
-    const msg = document.createElement('div');
-    const isUser = item.role === 'user';
-    msg.className = 'msg ' + (isUser ? 'user' : 'assistant');
-    msg.textContent = item.message || item.content || '';
-    wrap.appendChild(msg);
-    if (adminMode && item.id) {
-      wrap.title = 'Double click to delete';
-      wrap.ondblclick = async () => {
-        try {
-          await api('POST', '/admin/delete_message', {id: item.id}, true);
-          await loadHistory();
-        } catch (e) { console.error(e); }
-      };
-    }
-    chatDiv.appendChild(wrap);
-  }
-  chatDiv.scrollTop = chatDiv.scrollHeight;
-}
-
 async function sendMessage() {
   const text = input.value.trim();
   if (!text) return;
@@ -413,52 +416,44 @@ async function sendMessage() {
 
   try {
     if (FORCE_PREVIEW) {
-      // симуляция в preview-режиме
-      const wrapUser = document.createElement('div'); wrapUser.className = 'msgWrap';
-      const msgUser = document.createElement('div'); msgUser.className = 'msg user'; msgUser.textContent = text;
-      wrapUser.appendChild(msgUser); chatDiv.appendChild(wrapUser);
+      // preview
+      const u = document.createElement('div'); u.className='msgWrap';
+      const mu = document.createElement('div'); mu.className='msg user'; mu.textContent=text;
+      u.appendChild(mu); chatDiv.appendChild(u);
 
-      const wrapAss = document.createElement('div'); wrapAss.className = 'msgWrap';
-      const msgAss = document.createElement('div'); msgAss.className = 'msg assistant';
-      msgAss.textContent = 'Preview-ответ. Сессия и модель работают.';
-      wrapAss.appendChild(msgAss); chatDiv.appendChild(wrapAss);
+      const a = document.createElement('div'); a.className='msgWrap';
+      const ma = document.createElement('div'); ma.className='msg assistant'; ma.textContent='Preview ответ (сессия работает)';
+      a.appendChild(ma); chatDiv.appendChild(a);
       chatDiv.scrollTop = chatDiv.scrollHeight;
       return;
     }
 
     if (adminMode) {
-      const data = await api('POST', '/admin/chat', { session: currentSession, message: text }, true);
+      const data = await api('POST', '/admin/chat', {session: currentSession, message: text}, true);
       await loadHistory();
       await syncGlobalModel();
-      if (data.changed) setTimeout(() => location.reload(), 250);
+      if (data.changed) location.reload();
     } else {
       const data = await api('POST', '/chat', {message: text});
       await loadHistory();
       await syncGlobalModel();
-      if (data.changed) setTimeout(() => location.reload(), 250);
+      if (data.changed) location.reload();
     }
-  } catch (e) {
-    console.error(e);
-  } finally {
-    setThinking(false);
-  }
+  } catch (e) { console.error(e); }
+  finally { setThinking(false); }
 }
 
 function startPolling() {
   if (FORCE_PREVIEW) return;
   if (poller) clearInterval(poller);
-  poller = setInterval(async () => {
-    try { await loadHistory(); await syncGlobalModel(); } catch (_) {}
-  }, 2500);
+  poller = setInterval(() => { loadHistory(); syncGlobalModel(); }, 2500);
 }
 
+/* ====================== СОБЫТИЯ ====================== */
 sendLabel.onclick = sendMessage;
 input.addEventListener('input', autoResize);
 input.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendMessage();
-  }
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 });
 
 sessionCurrent.addEventListener('click', e => {
@@ -467,24 +462,32 @@ sessionCurrent.addEventListener('click', e => {
   toggleDropdown(sessionDropdown, sessionCurrent);
 });
 
-modelCurrent.onclick = e => {
+modelCurrent.addEventListener('click', e => {
   e.stopPropagation();
   if (!adminMode) return;
   toggleDropdown(modelDropdown, modelCurrent);
-};
+});
 
 document.addEventListener('click', closeAllDropdowns);
 sessionDropdown.addEventListener('click', e => e.stopPropagation());
 modelDropdown.addEventListener('click', e => e.stopPropagation());
 
-undoBtn.onclick = async () => { /* ... (оставил как было) */ try {
-  if (FORCE_PREVIEW) { /* preview уведомление */ return; }
-  await api('POST', '/admin/undo', {session: currentSession}, true);
-  await loadHistory(); location.reload();
-} catch(e){ console.error(e); }};
-
-clearBtn.onclick = async () => { /* аналогично */ };
-clearAllBtn.onclick = async () => { /* аналогично */ };
+/* кнопки админки */
+undoBtn.onclick = async () => {
+  if (FORCE_PREVIEW) return;
+  try { await api('POST', '/admin/undo', {session: currentSession}, true); await loadHistory(); location.reload(); }
+  catch(e){ console.error(e); }
+};
+clearBtn.onclick = async () => {
+  if (FORCE_PREVIEW) return;
+  try { await api('POST', '/admin/clear_session', {session: currentSession}, true); await loadHistory(); }
+  catch(e){ console.error(e); }
+};
+clearAllBtn.onclick = async () => {
+  if (FORCE_PREVIEW) return;
+  try { await api('POST', '/admin/clear_all_histories', {}, true); await loadHistory(); }
+  catch(e){ console.error(e); }
+};
 refreshBtn.onclick = () => location.reload();
 
 (async function init() {
@@ -498,7 +501,7 @@ refreshBtn.onclick = () => location.reload();
       currentSession = localStorage.getItem('pi_admin_target_session') || sessions[0];
       renderSessionDock();
       renderModelDock();
-      renderHistory([{role:'assistant', content:'✅ Preview-режим активен. Переключение сессий работает!'}]);
+      renderHistory([{role:'assistant', content:'✅ Новый дизайн + полностью рабочая кнопка выбора сессии!'}]);
     } else if (rawAlias.includes('-admin-')) {
       await loadAdmin();
     } else {
