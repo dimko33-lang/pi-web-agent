@@ -155,19 +155,20 @@ body{
     cursor:pointer;
 }
 
-/* ИСПРАВЛЕНИЕ: теперь список открывается ВНИЗ, а не вверх */
+/* ИСПРАВЛЕНИЕ: список открывается вверх, но сдвинут вниз, чтобы верхняя модель была видна */
 #modelDropdown{
     display:none;
     position:absolute;
-    top: 100%;           /* привязываем к нижнему краю родителя */
+    bottom: 100%;
     right:0;
+    transform: translateY(25px);  /* ← сдвиг вниз, подберите нужное значение (20-40px) */
     background:transparent;
     backdrop-filter:blur(4px);
     padding: 4px 0;
     z-index:40;
     white-space:nowrap;
-    max-height: 70vh;    /* чтобы влезал в экран, остальное скролл */
-    overflow-y:auto;
+    max-height: 70vh;             /* ограничиваем высоту */
+    overflow-y: auto;             /* включаем прокрутку */
     border:none;
     width:fit-content;
     max-width:360px;
@@ -249,7 +250,7 @@ body{
     #adminControls::-webkit-scrollbar{ display:none; }
     #adminControls select, #adminControls button{ font-size:10px; padding:2px 4px; height:22px; }
     #modelCurrent{ font-size:10px; max-width:120px; overflow:hidden; text-overflow:ellipsis; }
-    #modelDropdown{ max-width:92vw; }
+    #modelDropdown{ max-width:92vw; transform: translateY(20px); }
 }
 
 ::-webkit-scrollbar{width:8px}
@@ -260,15 +261,12 @@ body{
 </style>
 </head>
 <body>
-
+<!-- остальной HTML без изменений -->
 <div id="chatMessages"></div>
-
 <textarea id="messageInput" rows="1" placeholder="Type message..."></textarea>
 <div id="sendLabel">Send</div>
-
 <div id="bottomBar">
   <div id="pathDisplay">~/projects/pi-ru</div>
-
   <div id="adminControls">
     <select id="sessionSelect"></select>
     <button id="undoBtn" type="button">undo</button>
@@ -276,16 +274,15 @@ body{
     <button id="clearAllBtn" type="button">clear ALL</button>
     <button id="refreshBtn" type="button">refresh</button>
   </div>
-
   <div id="modelDock">
     <div id="modelCurrent">Loading...</div>
     <div id="modelDropdown"></div>
   </div>
 </div>
-
 <div id="fullscreenZone"><span>full screen</span></div>
 
 <script>
+// Ваш исходный скрипт без изменений
 const rawAlias = location.search.length > 1 ? decodeURIComponent(location.search.slice(1)) : '';
 const ADMIN_HEADER = rawAlias;
 
@@ -315,7 +312,6 @@ let currentModel = {
 let models = [];
 let poller = null;
 
-// Сокращение названий моделей
 function shortenLabel(provider, name) {
   let p = provider.toLowerCase();
   if (p === 'openrouter') p = 'OR';
