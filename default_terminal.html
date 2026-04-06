@@ -153,7 +153,6 @@ body{
     cursor:pointer;
 }
 
-/* DROPDOWN — без рамки, полупрозрачный фон, blur, на всю высоту */
 #modelDropdown{
     display:none;
     position:absolute;
@@ -181,41 +180,101 @@ body{
     font-weight:300;
     font-style:italic;
 }
+
 .model-option:hover{
     color:rgba(255,255,255,0.6);
 }
-.model-group-header{
-    padding:5px 12px 2px 12px;
-    color:rgba(255,255,255,0.5);
-    font-size:10px;
-    text-transform:uppercase;
-    border-bottom:1px solid rgba(255,255,255,0.1);
-    margin-top:4px;
-    letter-spacing:1px;
+
+.msgWrap{
+    margin-bottom:4px;
+}
+
+.msgWrap.adminDeletable{
+    cursor:pointer;
+}
+
+.msgWrap.adminDeletable:hover{
+    outline:1px dashed rgba(255,255,255,0.18);
+}
+
+.msg{
+    margin:0;
+    opacity:0.28;
+    letter-spacing:1.8px;
+    line-height:1.4;
+    word-break:break-word;
+    white-space:pre-wrap;
+}
+
+.msg.assistant{
+    opacity:1;
+    color:#f0f8f0;
+}
+
+.msg.user{
+    opacity:0.45;
+    font-size:0.8em;
 }
 
 #fullscreenZone{
     position:fixed;
     top:5px;
-    right:8px;
-    width:auto;
-    height:auto;
-    padding:4px 8px;
+    right:12px;
+    width:50px;
+    height:50px;
     z-index:100;
+    display:flex;
+    align-items:center;
+    justify-content:center;
     cursor:pointer;
     opacity:0.3;
-    border-radius:4px;
-    transition:opacity 0.2s;
 }
-#fullscreenZone:hover{
-    opacity:0.6;
-}
+
 #fullscreenZone span{
     font-size:10px;
-    color:rgba(255,255,255,0.6);
-    letter-spacing:0.5px;
-    font-family:'Cormorant Garamond',Georgia,serif;
-    font-style:italic;
+    color:rgba(255,255,255,0.4);
+}
+
+@media (max-width: 720px){
+    #bottomBar{
+        gap:6px;
+        align-items:flex-end;
+    }
+
+    #pathDisplay{
+        font-size:12px;
+        max-width:80px;
+        overflow:hidden;
+    }
+
+    #adminControls{
+        gap:4px;
+        justify-content:flex-start;
+        overflow-x:auto;
+        scrollbar-width:none;
+    }
+    #adminControls::-webkit-scrollbar{
+        display:none;
+    }
+
+    #adminControls select,
+    #adminControls button{
+        font-size:10px;
+        padding:2px 4px;
+        height:22px;
+    }
+
+    #modelCurrent{
+        font-size:10px;
+        max-width:120px;
+        overflow:hidden;
+        text-overflow:ellipsis;
+    }
+
+    #modelDropdown{
+        min-width:180px;
+        max-width:88vw;
+    }
 }
 
 ::-webkit-scrollbar{width:8px}
@@ -249,7 +308,7 @@ body{
   </div>
 </div>
 
-<div id="fullscreenZone"><span>full screen</span></div>
+<div id="fullscreenZone"><span>FULL</span></div>
 
 <script>
 const rawAlias = location.search.length > 1 ? decodeURIComponent(location.search.slice(1)) : '';
@@ -341,57 +400,40 @@ function renderHistory(items) {
 
 function renderModelDock() {
   modelCurrent.textContent = currentModel.label || (currentModel.provider + ' / ' + currentModel.model);
+  modelDropdown.innerHTML = '';
+
   if (!adminMode) {
     modelCurrent.classList.remove('admin-clickable');
+    modelDropdown.style.display = 'none';
     return;
   }
+
   modelCurrent.classList.add('admin-clickable');
-}
 
-function renderModelDropdown() {
-  if (!adminMode) return;
-  modelDropdown.innerHTML = '';
-  if (!models.length) {
-    const div = document.createElement('div');
-    div.className = 'model-option';
-    div.textContent = 'No models';
-    modelDropdown.appendChild(div);
-    return;
-  }
-
-  const groups = {};
   for (const m of models) {
-    const prov = m.provider || 'unknown';
-    if (!groups[prov]) groups[prov] = [];
-    groups[prov].push(m);
-  }
+    const el = document.createElement('div');
+    el.className = 'model-option';
+    el.textContent = `${m.provider}: ${m.name}`;
+    el.onclick = async (e) => {
+      e.stopPropagation();
+      try {
+        const data = await api('POST', '/admin/set_model', {
+          provider: m.provider,
+          model: m.model
+        }, true);
 
-  for (const [provider, items] of Object.entries(groups)) {
-    const header = document.createElement('div');
-    header.className = 'model-group-header';
-    header.textContent = provider.toUpperCase();
-    modelDropdown.appendChild(header);
-    for (const item of items) {
-      const opt = document.createElement('div');
-      opt.className = 'model-option';
-      opt.textContent = `${provider}: ${item.name}`;
-      opt.onclick = (e) => {
-        e.stopPropagation();
-        api('POST', '/admin/set_model', {
-          provider: item.provider,
-          model: item.model
-        }, true).then(data => {
-          currentModel = {
-            provider: data.provider,
-            model: data.model,
-            label: data.label || item.name
-          };
-          renderModelDock();
-          modelDropdown.style.display = 'none';
-        }).catch(console.error);
-      };
-      modelDropdown.appendChild(opt);
-    }
+        currentModel = {
+          provider: data.provider,
+          model: data.model,
+          label: data.label || m.name
+        };
+        renderModelDock();
+        modelDropdown.style.display = 'none';
+      } catch (e2) {
+        console.error(e2);
+      }
+    };
+    modelDropdown.appendChild(el);
   }
 }
 
@@ -411,7 +453,6 @@ async function loadModels() {
   try {
     const data = await api('GET', '/models');
     models = data.models || [];
-    renderModelDropdown();
   } catch (_) {
     models = [];
   }
@@ -555,14 +596,11 @@ refreshBtn.onclick = () => location.reload();
 modelCurrent.onclick = (e) => {
   e.stopPropagation();
   if (!adminMode) return;
-  renderModelDropdown();
   modelDropdown.style.display = modelDropdown.style.display === 'block' ? 'none' : 'block';
 };
 
-document.addEventListener('click', (e) => {
-  if (!modelDropdown.contains(e.target) && e.target !== modelCurrent) {
-    modelDropdown.style.display = 'none';
-  }
+document.addEventListener('click', () => {
+  modelDropdown.style.display = 'none';
 });
 
 fsZone.addEventListener('click', () => {
