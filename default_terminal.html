@@ -13,34 +13,99 @@
     --glass-border:rgba(255,255,255,0.18);
     --glass-border-strong:rgba(255,255,255,0.26);
 }
-body{margin:0;padding:0;height:100dvh;background:rgb(20,40,76);color:#fff;font-family:'Cormorant Garamond',Georgia,serif;font-weight:300;font-style:italic;overflow:hidden;}
-#chatMessages{position:fixed;top:10px;left:10px;right:10px;bottom:115px;overflow-y:auto;padding:10px;}
-#messageInput{position:fixed;bottom:40px;left:10px;right:10px;max-height:120px;background:transparent;color:#fff;border:none;border-top:1px solid rgba(255,255,255,0.3);border-bottom:1px solid rgba(255,255,255,0.3);font-size:15px;letter-spacing:1.8px;padding:8px 12px;height:35px;min-height:35px;box-sizing:border-box;outline:none;resize:none;line-height:1.4;overflow-y:auto;}
-#messageInput::placeholder{color:rgba(255,255,255,0.25);font-style:italic;}
-#sendLabel{position:fixed;bottom:46px;right:20px;color:rgba(255,255,255,0.6);font-size:20px;cursor:pointer;user-select:none;transition:color 0.2s,opacity 0.2s,transform 0.2s;}
-#sendLabel:hover{color:rgba(255,255,255,0.9);}
-#sendLabel.thinking{color:rgba(255,255,255,0.95);animation:pulseSend 1s ease-in-out infinite;}
-@keyframes pulseSend{0%{opacity:.45;transform:translateY(0px)}50%{opacity:1;transform:translateY(-1px)}100%{opacity:.45;transform:translateY(0px)}}
-#bottomBar{position:fixed;left:10px;right:10px;bottom:12px;min-height:24px;display:flex;align-items:center;gap:10px;z-index:20;}
-#pathDisplay{font-size:16px;opacity:0.45;line-height:1;white-space:nowrap;flex:0 0 auto;}
-#adminControls{display:none;align-items:center;gap:6px;min-width:0;flex:1 1 auto;justify-content:center;}
-#adminControls select,#adminControls button,.control-trigger{
-    background:var(--glass-bg);color:#fff;border:1px solid var(--glass-border);border-radius:3px;
-    padding:3px 8px;font-family:'Cormorant Garamond',Georgia,serif;font-size:11px;font-style:italic;
-    line-height:22px;height:24px;letter-spacing:0.9px;backdrop-filter:blur(10px);transition:all 0.2s;
+body{
+    margin:0;padding:0;height:100dvh;
+    background:rgb(20,40,76);color:#fff;
+    font-family:'Cormorant Garamond',Georgia,serif;
+    font-weight:300;font-style:italic;overflow:hidden;
 }
-#adminControls select:hover,#adminControls button:hover,.control-trigger:hover{background:var(--glass-bg-hover);border-color:var(--glass-border-strong);}
-#sessionSelect{min-width:110px;text-align:center;}
+#chatMessages{
+    position:fixed;top:10px;left:10px;right:10px;bottom:115px;
+    overflow-y:auto;padding:10px;
+}
+#messageInput{
+    position:fixed;bottom:40px;left:10px;right:10px;max-height:120px;
+    background:transparent;color:#fff;border:none;
+    border-top:1px solid rgba(255,255,255,0.3);
+    border-bottom:1px solid rgba(255,255,255,0.3);
+    font-size:15px;letter-spacing:1.8px;padding:8px 12px;
+    height:35px;min-height:35px;box-sizing:border-box;
+    outline:none;resize:none;line-height:1.4;overflow-y:auto;
+}
+#messageInput::placeholder{color:rgba(255,255,255,0.25);font-style:italic;}
+#sendLabel{
+    position:fixed;bottom:46px;right:20px;
+    color:rgba(255,255,255,0.6);font-size:20px;cursor:pointer;
+    user-select:none;transition:color 0.2s,opacity 0.2s,transform 0.2s;
+}
+#sendLabel:hover{color:rgba(255,255,255,0.9);}
+#sendLabel.thinking{
+    color:rgba(255,255,255,0.95);
+    animation:pulseSend 1s ease-in-out infinite;
+}
+@keyframes pulseSend{
+    0% {opacity:.45;transform:translateY(0px);}
+    50% {opacity:1;transform:translateY(-1px);}
+    100% {opacity:.45;transform:translateY(0px);}
+}
+#bottomBar{
+    position:fixed;left:10px;right:10px;bottom:12px;
+    min-height:24px;display:flex;align-items:center;gap:10px;z-index:20;
+}
+#pathDisplay{
+    font-size:16px;opacity:0.45;line-height:1;white-space:nowrap;flex:0 0 auto;
+}
+#adminControls{
+    display:none;align-items:center;gap:6px;min-width:0;flex:1 1 auto;justify-content:center;
+}
+#adminControls select,#adminControls button{
+    background:var(--glass-bg);color:#fff;border:1px solid var(--glass-border);
+    border-radius:3px;padding:3px 8px;font-family:'Cormorant Garamond',Georgia,serif;
+    font-size:11px;font-style:italic;line-height:22px;height:24px;
+    letter-spacing:0.9px;backdrop-filter:blur(10px);transition:all 0.2s;
+}
+#adminControls select:hover,#adminControls button:hover{
+    background:var(--glass-bg-hover);border-color:var(--glass-border-strong);
+}
+#sessionSelect{min-width:130px;text-align:center;}
 #modelDock{margin-left:auto;position:relative;flex:0 0 auto;}
-#modelCurrent{font-size:12px;opacity:0.62;text-align:right;padding-right:5px;cursor:pointer;}
+#modelCurrent{
+    font-size:12px;opacity:0.62;text-align:right;padding-right:5px;cursor:pointer;
+}
+#modelCurrent.admin-clickable{cursor:pointer;}
+#modelDropdown{
+    display:none;position:absolute;bottom:100%;right:0;background:transparent;
+    backdrop-filter:blur(4px);padding:6px 0 4px 0;z-index:40;white-space:nowrap;
+    max-height:calc(100dvh - 80px);overflow-y:auto;border:none;max-width:360px;
+}
+.model-option{
+    padding:7px 12px;color:rgba(255,255,255,0.72);font-size:11px;cursor:pointer;
+    text-align:right;white-space:nowrap;font-family:'Cormorant Garamond',Georgia,serif;
+    font-weight:300;font-style:italic;transition:background 0.18s,color 0.18s;
+}
+.model-option:hover{background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.9);}
 .msgWrap{margin-bottom:4px;}
 .msgWrap.adminDeletable{cursor:pointer;}
 .msgWrap.adminDeletable:hover{outline:1px dashed rgba(255,255,255,0.18);}
 .msg{margin:0;opacity:0.28;letter-spacing:1.8px;line-height:1.4;word-break:break-word;white-space:pre-wrap;}
 .msg.assistant{opacity:1;color:#f0f8f0;}
 .msg.user{opacity:0.45;font-size:0.8em;}
-#fullscreenZone{position:fixed;top:5px;right:12px;width:50px;height:50px;z-index:100;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0.3;}
+#fullscreenZone{
+    position:fixed;top:5px;right:12px;width:50px;height:50px;z-index:100;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0.3;
+}
 #fullscreenZone span{font-size:10px;color:rgba(255,255,255,0.2);}
+@media (max-width:720px){
+    #bottomBar{gap:6px;align-items:flex-end;}
+    #pathDisplay{font-size:12px;max-width:80px;overflow:hidden;}
+    #adminControls{gap:4px;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;}
+    #adminControls::-webkit-scrollbar{display:none;}
+    #adminControls select,#adminControls button{font-size:10px;padding:2px 4px;height:22px;}
+}
+::-webkit-scrollbar{width:8px}
+::-webkit-scrollbar-track{background:rgb(16,32,60)}
+::-webkit-scrollbar-thumb{background:rgb(26,52,98);border-radius:4px}
+*{scrollbar-width:thin;scrollbar-color:rgb(26,52,98) rgb(16,32,60)}
 </style>
 </head>
 <body>
@@ -52,7 +117,7 @@ body{margin:0;padding:0;height:100dvh;background:rgb(20,40,76);color:#fff;font-f
 <div id="bottomBar">
   <div id="pathDisplay">~/projects/pi-ru</div>
   <div id="adminControls">
-    <select id="sessionSelect" class="control-trigger"></select>
+    <select id="sessionSelect"></select>
     <button id="undoBtn" type="button">undo</button>
     <button id="clearBtn" type="button">clear</button>
     <button id="clearAllBtn" type="button">clear ALL</button>
@@ -60,14 +125,13 @@ body{margin:0;padding:0;height:100dvh;background:rgb(20,40,76);color:#fff;font-f
   </div>
   <div id="modelDock">
     <div id="modelCurrent">Loading...</div>
-    <div id="modelDropdown" class="glass-dropdown"></div>
+    <div id="modelDropdown"></div>
   </div>
 </div>
 
 <div id="fullscreenZone"><span>FULL</span></div>
 
 <script>
-/* ВСЁ ОСТАЛЬНОЕ — ТОЧНО КАК В ТВОЁМ РАБОЧЕМ ФАЙЛЕ (только стили + select) */
 const rawAlias = location.search.length > 1 ? decodeURIComponent(location.search.slice(1)) : '';
 const ADMIN_HEADER = rawAlias;
 
@@ -89,112 +153,297 @@ const modelDropdown = document.getElementById('modelDropdown');
 
 let adminMode = false;
 let currentSession = 'default';
-let currentModel = {provider:'groq',model:'llama-3.1-8b-instant',label:'Groq · Llama 3.1 8B (fast/free)'};
+let currentModel = {
+  provider: 'groq',
+  model: 'llama-3.1-8b-instant',
+  label: 'Groq · Llama 3.1 8B (fast/free)'
+};
 let models = [];
 let poller = null;
 
-function setThinking(v){sendLabel.classList.toggle('thinking',!!v);sendLabel.textContent=v?'...':'Send';}
-
-function api(method,url,data=null,admin=false){
-  const headers={'Content-Type':'application/json'};
-  if(admin) headers['X-Admin-Alias']=ADMIN_HEADER;
-  return fetch(url,{method,headers,body:data?JSON.stringify(data):null})
-    .then(async res=>{const p=await res.json().catch(()=>{});if(!res.ok)throw new Error(p.error||'HTTP '+res.status);return p;});
+function setThinking(v) {
+  sendLabel.classList.toggle('thinking', !!v);
+  sendLabel.textContent = v ? '...' : 'Send';
 }
 
-function autoResize(){input.style.height='auto';input.style.height=Math.min(input.scrollHeight,120)+'px';}
+function api(method, url, data=null, admin=false) {
+  const headers = {'Content-Type': 'application/json'};
+  if (admin) headers['X-Admin-Alias'] = ADMIN_HEADER;
 
-function renderHistory(items){/* точно как в рабочем файле */}
-  chatDiv.innerHTML='';if(!items||!items.length)return;
-  for(const item of items){
-    const wrap=document.createElement('div');
-    wrap.className='msgWrap'+(adminMode?' adminDeletable':'');
-    if(item.id)wrap.dataset.id=item.id;
-    const msg=document.createElement('div');
-    msg.className='msg '+(item.role==='user'?'user':'assistant');
-    msg.textContent=item.message||item.content||'';
-    wrap.appendChild(msg);
-    if(adminMode&&item.id){
-      wrap.title='Double click to delete';
-      wrap.ondblclick=async()=>{try{await api('POST','/admin/delete_message',{id:item.id},true);await loadHistory();}catch(e){console.error(e);}};
-    }
-    chatDiv.appendChild(wrap);
-  }
-  chatDiv.scrollTop=chatDiv.scrollHeight;
-}
-
-function renderModelDock(){/* как в твоём последнем файле */}
-  modelCurrent.textContent=currentModel.label||(currentModel.provider+' / '+currentModel.model);
-  modelDropdown.innerHTML='';
-  if(!adminMode){modelCurrent.classList.remove('admin-clickable');return;}
-  modelCurrent.classList.add('admin-clickable');
-  models.forEach(m=>{
-    const el=document.createElement('div');
-    el.className='model-option';
-    el.textContent=m.name;
-    el.onclick=async(e)=>{e.stopPropagation();try{const data=await api('POST','/admin/set_model',{provider:m.provider,model:m.model},true);currentModel={provider:data.provider,model:data.model,label:data.label||m.name};renderModelDock();modelDropdown.style.display='none';}catch(e2){console.error(e2);}};
-    modelDropdown.appendChild(el);
+  return fetch(url, {
+    method,
+    headers,
+    body: data ? JSON.stringify(data) : null
+  }).then(async (res) => {
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(payload.error || ('HTTP ' + res.status));
+    return payload;
   });
 }
 
-async function syncGlobalModel(){try{const gm=await api('GET','/global_model');currentModel={provider:gm.provider,model:gm.model,label:gm.label||(gm.provider+' / '+gm.model)};renderModelDock();}catch(_){}}
-async function loadModels(){try{const data=await api('GET','/models');models=data.models||[];}catch(_){models=[];}}
-async function loadPublic(){adminMode=false;adminControls.style.display='none';pathDisplay.textContent='~/projects/pi-ru';await syncGlobalModel();await loadHistory();}
-async function loadAdmin(){
-  adminMode=true;adminControls.style.display='flex';pathDisplay.textContent='~/projects/pi-ru';
-  const state=await api('GET','/admin/state',null,true);
-  await loadModels();
-  currentModel=state.global_model||currentModel;
-  currentSession=localStorage.getItem('pi_admin_target_session')||'private';
-  if(!state.sessions.includes(currentSession)){
-    currentSession=state.sessions.includes('private')?'private':(state.sessions[0]||'default');
+function autoResize() {
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+}
+
+function renderHistory(items) {
+  chatDiv.innerHTML = '';
+  if (!items || !items.length) return;
+
+  for (const item of items) {
+    const wrap = document.createElement('div');
+    wrap.className = 'msgWrap' + (adminMode ? ' adminDeletable' : '');
+    if (item.id) wrap.dataset.id = item.id;
+
+    const msg = document.createElement('div');
+    const isUser = item.role === 'user';
+    msg.className = 'msg ' + (isUser ? 'user' : 'assistant');
+    msg.textContent = item.message || item.content || '';
+    wrap.appendChild(msg);
+
+    if (adminMode && item.id) {
+      wrap.title = 'Double click to delete';
+      wrap.ondblclick = async () => {
+        try {
+          await api('POST', '/admin/delete_message', {id: item.id}, true);
+          await loadHistory();
+        } catch (e) {
+          console.error(e);
+        }
+      };
+    }
+
+    chatDiv.appendChild(wrap);
   }
-  sessionSelect.innerHTML='';
-  for(const s of state.sessions){
-    const opt=document.createElement('option');
-    opt.value=s;opt.textContent=s;if(s===currentSession)opt.selected=true;
+
+  chatDiv.scrollTop = chatDiv.scrollHeight;
+}
+
+function renderModelDock() {
+  modelCurrent.textContent = currentModel.label || (currentModel.provider + ' / ' + currentModel.model);
+  modelDropdown.innerHTML = '';
+
+  if (!adminMode) {
+    modelCurrent.classList.remove('admin-clickable');
+    modelDropdown.style.display = 'none';
+    return;
+  }
+
+  modelCurrent.classList.add('admin-clickable');
+
+  for (const m of models) {
+    const el = document.createElement('div');
+    el.className = 'model-option';
+    el.textContent = m.name;
+    el.onclick = async (e) => {
+      e.stopPropagation();
+      try {
+        const data = await api('POST', '/admin/set_model', {
+          provider: m.provider,
+          model: m.model
+        }, true);
+
+        currentModel = {
+          provider: data.provider,
+          model: data.model,
+          label: data.label || m.name
+        };
+        renderModelDock();
+        modelDropdown.style.display = 'none';
+      } catch (e2) {
+        console.error(e2);
+      }
+    };
+    modelDropdown.appendChild(el);
+  }
+}
+
+async function syncGlobalModel() {
+  try {
+    const gm = await api('GET', '/global_model');
+    currentModel = {
+      provider: gm.provider,
+      model: gm.model,
+      label: gm.label || (gm.provider + ' / ' + gm.model)
+    };
+    renderModelDock();
+  } catch (_) {}
+}
+
+async function loadModels() {
+  try {
+    const data = await api('GET', '/models');
+    models = data.models || [];
+  } catch (_) {
+    models = [];
+  }
+}
+
+async function loadPublic() {
+  adminMode = false;
+  adminControls.style.display = 'none';
+  pathDisplay.textContent = '~/projects/pi-ru';
+  await syncGlobalModel();
+  await loadHistory();
+}
+
+async function loadAdmin() {
+  adminMode = true;
+  adminControls.style.display = 'flex';
+  pathDisplay.textContent = '~/projects/pi-ru';
+
+  const state = await api('GET', '/admin/state', null, true);
+  await loadModels();
+
+  currentModel = state.global_model || currentModel;
+  currentSession = localStorage.getItem('pi_admin_target_session') || 'private';
+  if (!state.sessions.includes(currentSession)) {
+    currentSession = state.sessions.includes('private') ? 'private' : (state.sessions[0] || 'default');
+  }
+
+  sessionSelect.innerHTML = '';
+  for (const s of state.sessions) {
+    const opt = document.createElement('option');
+    opt.value = s;
+    opt.textContent = s;
+    if (s === currentSession) opt.selected = true;
     sessionSelect.appendChild(opt);
   }
+
   renderModelDock();
   await loadHistory();
 }
-async function loadHistory(){
-  if(adminMode){
-    const data=await api('POST','/admin/history',{session:currentSession},true);
-    renderHistory(data.history||[]);
-  }else{
-    const data=await api('POST','/history',{});
-    renderHistory(data.history||[]);
+
+async function loadHistory() {
+  if (adminMode) {
+    const data = await api('POST', '/admin/history', {session: currentSession}, true);
+    renderHistory(data.history || []);
+  } else {
+    const data = await api('POST', '/history', {});
+    renderHistory(data.history || []);
   }
 }
-async function sendMessage(){const text=input.value.trim();if(!text)return;input.value='';autoResize();setThinking(true);
-  try{if(adminMode){const data=await api('POST','/admin/chat',{session:currentSession,message:text},true);await loadHistory();await syncGlobalModel();if(data.changed)setTimeout(()=>location.reload(),250);}
-  else{const data=await api('POST','/chat',{message:text});await loadHistory();await syncGlobalModel();if(data.changed)setTimeout(()=>location.reload(),250);}}catch(e){console.error(e);}finally{setThinking(false);}}
-function startPolling(){if(poller)clearInterval(poller);poller=setInterval(async()=>{try{await loadHistory();await syncGlobalModel();}catch(_){}},2500);}
 
-sendLabel.onclick=sendMessage;
-input.addEventListener('input',autoResize);
-input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}});
+async function sendMessage() {
+  const text = input.value.trim();
+  if (!text) return;
 
-sessionSelect.addEventListener('change',async()=>{currentSession=sessionSelect.value;localStorage.setItem('pi_admin_target_session',currentSession);await loadHistory();});
+  input.value = '';
+  autoResize();
+  setThinking(true);
 
-undoBtn.onclick=async()=>{try{await api('POST','/admin/undo',{session:currentSession},true);await loadHistory();location.reload();}catch(e){console.error(e);}};
-clearBtn.onclick=async()=>{try{await api('POST','/admin/clear_session',{session:currentSession},true);await loadHistory();}catch(e){console.error(e);}};
-clearAllBtn.onclick=async()=>{try{await api('POST','/admin/clear_all_histories',{},true);await loadHistory();}catch(e){console.error(e);}};
-refreshBtn.onclick=()=>location.reload();
+  try {
+    if (adminMode) {
+      const data = await api('POST', '/admin/chat', {
+        session: currentSession,
+        message: text
+      }, true);
 
-modelCurrent.onclick=(e)=>{e.stopPropagation();if(!adminMode)return;modelDropdown.style.display=modelDropdown.style.display==='block'?'none':'block';};
-document.addEventListener('click',()=>{modelDropdown.style.display='none';});
-fsZone.addEventListener('click',()=>{if(!document.fullscreenElement)document.documentElement.requestFullscreen().catch(()=>{});else document.exitFullscreen();});
+      await loadHistory();
+      await syncGlobalModel();
 
-(async function init(){
-  try{
-    if(rawAlias.includes('-admin-')) await loadAdmin();
-    else await loadPublic();
+      if (data.changed) setTimeout(() => location.reload(), 250);
+    } else {
+      const data = await api('POST', '/chat', {message: text});
+
+      await loadHistory();
+      await syncGlobalModel();
+
+      if (data.changed) setTimeout(() => location.reload(), 250);
+    }
+  } catch (e) {
+    console.error(e);
+  } finally {
+    setThinking(false);
+  }
+}
+
+function startPolling() {
+  if (poller) clearInterval(poller);
+  poller = setInterval(async () => {
+    try {
+      await loadHistory();
+      await syncGlobalModel();
+    } catch (_) {}
+  }, 2500);
+}
+
+sendLabel.onclick = sendMessage;
+
+input.addEventListener('input', autoResize);
+input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+sessionSelect.addEventListener('change', async () => {
+  currentSession = sessionSelect.value;
+  localStorage.setItem('pi_admin_target_session', currentSession);
+  await loadHistory();
+});
+
+undoBtn.onclick = async () => {
+  try {
+    await api('POST', '/admin/undo', {session: currentSession}, true);
+    await loadHistory();
+    location.reload();
+  } catch (e) {
+    console.error(e);
+  }
+};
+
+clearBtn.onclick = async () => {
+  try {
+    await api('POST', '/admin/clear_session', {session: currentSession}, true);
+    await loadHistory();
+  } catch (e) {
+    console.error(e);
+  }
+};
+
+clearAllBtn.onclick = async () => {
+  try {
+    await api('POST', '/admin/clear_all_histories', {}, true);
+    await loadHistory();
+  } catch (e) {
+    console.error(e);
+  }
+};
+
+refreshBtn.onclick = () => location.reload();
+
+modelCurrent.onclick = (e) => {
+  e.stopPropagation();
+  if (!adminMode) return;
+  modelDropdown.style.display = modelDropdown.style.display === 'block' ? 'none' : 'block';
+};
+
+document.addEventListener('click', () => {
+  modelDropdown.style.display = 'none';
+});
+
+fsZone.addEventListener('click', () => {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+  else document.exitFullscreen();
+});
+
+(async function init() {
+  try {
+    if (rawAlias.includes('-admin-')) {
+      await loadAdmin();
+    } else {
+      await loadPublic();
+    }
+
     startPolling();
     autoResize();
     input.focus();
-  }catch(e){console.error(e);}
+  } catch (e) {
+    console.error(e);
+    chatDiv.innerHTML = '';
+  }
 })();
 </script>
 </body>
