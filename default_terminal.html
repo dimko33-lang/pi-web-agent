@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -7,10 +6,10 @@
 <title>~/projects/pi-ru</title>
 
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
 :root{
-    --dock-right-gap:5px;
+    --dock-right-gap: 10px;
 }
 
 html, body{
@@ -20,11 +19,15 @@ html, body{
 }
 
 body{
-    background: rgb(20,20,25);
+    background:
+        radial-gradient(1100px 620px at 108% -8%, rgba(86,102,168,0.18), transparent 56%),
+        radial-gradient(900px 540px at -8% 108%, rgba(70,82,136,0.11), transparent 60%),
+        linear-gradient(180deg, rgba(255,255,255,0.018), rgba(255,255,255,0)),
+        rgb(20,20,25);
     color:#fff;
     font-family:'Inter',system-ui,sans-serif;
-    font-style: italic;
     font-weight:400;
+    font-style:normal;
     overflow:hidden;
     -webkit-font-smoothing:antialiased;
     -moz-osx-font-smoothing:grayscale;
@@ -62,12 +65,11 @@ body{
     resize:none;
     line-height:1.4;
     overflow-y:auto;
-    font-style: italic;
 }
 
 #messageInput::placeholder{
     color:rgba(255,255,255,0.25);
-    font-style: italic;
+    font-style:normal;
 }
 
 #sendLabel{
@@ -80,7 +82,6 @@ body{
     cursor:pointer;
     user-select:none;
     transition:color 0.2s, opacity 0.2s, transform 0.2s;
-    font-style: italic;
 }
 
 #sendLabel:hover{
@@ -106,7 +107,7 @@ body{
     min-height:24px;
     display:flex;
     align-items:center;
-    gap:8px;
+    gap:6px;
     z-index:20;
 }
 
@@ -117,66 +118,26 @@ body{
     white-space:nowrap;
     flex:0 0 auto;
     letter-spacing:0.01em;
-    font-style: italic;
+    margin-right:auto;
 }
 
-#rightGroup{
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-}
-
-/* Публичные кнопки (только undo/redo) */
-#publicControls{
-    display: none;
-    align-items: center;
-    gap: 6px;
-}
-
-#publicControls button{
-    background:rgba(255,255,255,0.08);
-    color:#fff;
-    border:1px solid rgba(255,255,255,0.18);
-    border-radius:2px;
-    font-family:'Inter',system-ui,sans-serif;
-    font-size:10px;
-    font-style: italic;
-    font-weight:500;
-    letter-spacing:0.02em;
-    backdrop-filter:blur(4px);
-    -webkit-backdrop-filter:blur(4px);
-    transition:all 0.2s;
-    height:20px;
-    min-height:20px;
-    padding:0 7px;
-    min-width:42px;
-    display:inline-flex;
+#rightControls{
+    margin-left:auto;
+    min-width:0;
+    display:flex;
     align-items:center;
-    justify-content:center;
-    line-height:1;
-    cursor:pointer;
+    justify-content:flex-end;
+    gap:4px;
 }
 
-#publicControls button:hover{
-    background:rgba(255,255,255,0.12);
-    border-color:rgba(255,255,255,0.26);
-}
-
-/* Админские кнопки */
 #adminControls{
     display:none;
     align-items:center;
     gap:4px;
     min-width:0;
     flex:0 1 auto;
-    overflow-x:auto;
-    scrollbar-width:none;
-}
-
-#adminControls::-webkit-scrollbar{
-    display:none;
+    justify-content:flex-end;
+    margin-left:0;
 }
 
 #adminControls select,
@@ -187,7 +148,7 @@ body{
     border-radius:2px;
     font-family:'Inter',system-ui,sans-serif;
     font-size:10px;
-    font-style: italic;
+    font-style:normal;
     font-weight:500;
     letter-spacing:0.02em;
     backdrop-filter:blur(4px);
@@ -229,8 +190,9 @@ body{
     border-color:rgba(255,255,255,0.26);
 }
 
-/* Блок модели (только в админке) */
 #modelDock{
+    margin-left:0;
+    margin-right:-10px;
     position:relative;
     flex:0 0 150px;
     width:150px;
@@ -250,10 +212,10 @@ body{
     font-weight:500;
     opacity:0.68;
     text-align:right;
-    padding-right:var(--dock-right-gap);
+    padding-right:10px;
     cursor:pointer;
     letter-spacing:0.01em;
-    font-style: italic;
+    user-select:none;
 }
 
 #modelCurrent.admin-clickable{
@@ -280,7 +242,7 @@ body{
 
 .model-option{
     position:relative;
-    padding:7px var(--dock-right-gap) 7px 10px;
+    padding:7px 10px 7px 10px;
     color:rgba(255,255,255,0.72);
     font-size:10px;
     cursor:pointer;
@@ -289,7 +251,7 @@ body{
     text-overflow:ellipsis;
     font-family:'Inter',system-ui,sans-serif;
     font-weight:500;
-    font-style: italic;
+    font-style:normal;
     letter-spacing:0.01em;
     border:none;
     border-radius:0;
@@ -338,7 +300,6 @@ body{
     white-space:pre-wrap;
     font-size:14px;
     font-family:'Inter',system-ui,sans-serif;
-    font-style: italic;
 }
 
 .msg.assistant{
@@ -372,7 +333,6 @@ body{
     font-family:'Inter',system-ui,sans-serif;
     font-weight:500;
     letter-spacing:0.04em;
-    font-style: italic;
 }
 
 @media (max-width:720px){
@@ -387,24 +347,20 @@ body{
         overflow:hidden;
     }
 
-    #rightGroup{
-        gap:6px;
+    #rightControls{
+        gap:4px;
         max-width:calc(100vw - 112px);
-        flex-shrink: 1;
-        min-width: 0;
-    }
-
-    #publicControls button{
-        height:19px;
-        min-height:19px;
-        padding:0 5px;
-        min-width:38px;
-        font-size:9px;
     }
 
     #adminControls{
         gap:4px;
+        justify-content:flex-end;
         overflow-x:auto;
+        scrollbar-width:none;
+    }
+
+    #adminControls::-webkit-scrollbar{
+        display:none;
     }
 
     #adminControls select,
@@ -430,15 +386,16 @@ body{
     }
 
     #modelDock{
-        flex:0 0 118px;
         width:118px;
         min-width:118px;
         max-width:118px;
+        margin-right:-10px;
     }
 
     #modelCurrent{
         max-width:100%;
         font-size:10px;
+        padding-right:10px;
     }
 
     #modelDropdown{
@@ -481,14 +438,8 @@ body{
 
 <div id="bottomBar">
   <div id="pathDisplay">~/projects/pi-ru</div>
-  <div id="rightGroup">
-    <!-- Публичные кнопки (только undo/redo) -->
-    <div id="publicControls">
-      <button id="publicUndoBtn" type="button">undo</button>
-      <button id="publicRedoBtn" type="button">redo</button>
-    </div>
 
-    <!-- Админские кнопки (полный набор) -->
+  <div id="rightControls">
     <div id="adminControls">
       <select id="sessionSelect"></select>
       <button id="undoBtn" type="button">undo</button>
@@ -497,9 +448,8 @@ body{
       <button id="refreshBtn" type="button">refresh</button>
     </div>
 
-    <!-- Блок выбора модели (только в админке) -->
     <div id="modelDock">
-      <div id="modelCurrent">Loading...</div>
+      <div id="modelCurrent"></div>
       <div id="modelDropdown"></div>
     </div>
   </div>
@@ -518,14 +468,11 @@ const pathDisplay = document.getElementById('pathDisplay');
 const fsZone = document.getElementById('fullscreenZone');
 
 const adminControls = document.getElementById('adminControls');
-const publicControls = document.getElementById('publicControls');
 const sessionSelect = document.getElementById('sessionSelect');
 const undoBtn = document.getElementById('undoBtn');
 const redoBtn = document.getElementById('redoBtn');
 const clearBtn = document.getElementById('clearBtn');
 const refreshBtn = document.getElementById('refreshBtn');
-const publicUndoBtn = document.getElementById('publicUndoBtn');
-const publicRedoBtn = document.getElementById('publicRedoBtn');
 
 const modelCurrent = document.getElementById('modelCurrent');
 const modelDropdown = document.getElementById('modelDropdown');
@@ -535,14 +482,15 @@ let currentSession = 'default';
 let currentModel = {
   provider: 'groq',
   model: 'llama-3.1-8b-instant',
-  label: 'Groq · Llama 3.1 8B (fast/free)'
+  label: 'Llama 3.1 8B'
 };
 let models = [];
 let poller = null;
 let isSending = false;
-
 let clearConfirmArmed = false;
 let clearConfirmTimer = null;
+
+const MODEL_LABEL_STORAGE_KEY = 'pi_last_model_label';
 
 function baseModelName(name) {
   let s = String(name || '').trim();
@@ -655,6 +603,18 @@ function dropdownModelLabel(provider, name) {
   return `${providerShort(provider)}: ${humanModelName(name)}`;
 }
 
+function setVisibleModelLabel(label) {
+  const safe = String(label || '').trim();
+  if (!safe) return;
+  modelCurrent.textContent = safe;
+  localStorage.setItem(MODEL_LABEL_STORAGE_KEY, safe);
+}
+
+function seedModelLabelFromStorage() {
+  const saved = localStorage.getItem(MODEL_LABEL_STORAGE_KEY);
+  modelCurrent.textContent = saved || 'model';
+}
+
 function setThinking(v) {
   sendLabel.classList.toggle('thinking', !!v);
   sendLabel.textContent = v ? '...' : 'Send';
@@ -739,7 +699,9 @@ function renderHistory(items) {
 
 function renderModelDock() {
   const rawName = currentModel.model || currentModel.label || '';
-  modelCurrent.textContent = currentModelLabel(currentModel.provider, rawName);
+  const currentLabel = currentModelLabel(currentModel.provider, rawName);
+
+  setVisibleModelLabel(currentLabel);
   modelCurrent.title = humanModelName(rawName);
   modelDropdown.innerHTML = '';
 
@@ -816,7 +778,6 @@ async function loadModels() {
 async function loadPublic() {
   adminMode = false;
   adminControls.style.display = 'none';
-  publicControls.style.display = 'flex';
   pathDisplay.textContent = '~/projects/pi-ru';
   await syncGlobalModel();
   await loadHistory();
@@ -825,7 +786,6 @@ async function loadPublic() {
 async function loadAdmin() {
   adminMode = true;
   adminControls.style.display = 'flex';
-  publicControls.style.display = 'none';
   pathDisplay.textContent = '~/projects/pi-ru';
 
   const state = await api('GET', '/admin/state', null, true);
@@ -959,27 +919,6 @@ redoBtn.onclick = async () => {
   }
 };
 
-// Публичные кнопки (без заголовка admin)
-publicUndoBtn.onclick = async () => {
-  try {
-    await api('POST', '/undo', {});
-    location.reload();
-  } catch (e) {
-    console.error(e);
-    showError(e.message || 'Undo failed');
-  }
-};
-
-publicRedoBtn.onclick = async () => {
-  try {
-    await api('POST', '/redo', {});
-    location.reload();
-  } catch (e) {
-    console.error(e);
-    showError(e.message || 'Redo failed');
-  }
-};
-
 clearBtn.onclick = async () => {
   try {
     if (!clearConfirmArmed) {
@@ -1018,12 +957,17 @@ document.addEventListener('click', () => {
 });
 
 fsZone.addEventListener('click', () => {
-  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
-  else document.exitFullscreen();
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  } else {
+    document.exitFullscreen();
+  }
 });
 
 (async function init() {
   try {
+    seedModelLabelFromStorage();
+
     if (rawAlias.includes('-admin-')) {
       await loadAdmin();
     } else {
