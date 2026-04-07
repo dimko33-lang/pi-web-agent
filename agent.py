@@ -64,7 +64,7 @@ class Agent:
         self.default_openrouter_model = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o").strip()
         self.default_kimi_model = os.getenv("KIMI_MODEL", "kimi-k2.5").strip()
 
-        self.timeout = 180
+        self.timeout = 90  # уменьшено с 180
 
     def default_model_for(self, provider: str) -> str:
         if provider == "openrouter":
@@ -248,29 +248,59 @@ class Agent:
 
         doc = re.search(r"(?is)(<!doctype html>.*?</html>|<html\b.*?</html>)", raw)
         html = doc.group(1).strip() if doc else raw.strip()
-
         lower = html.lower()
+
         if "<html" not in lower and "<!doctype" not in lower:
             raise ValueError("Ответ не похож на полный HTML")
+
+        # обязательные элементы интерфейса, которые нельзя ломать
+        required_markers = [
+            "chatMessages",
+            "messageInput",
+            "sendLabel",
+            "pathDisplay",
+            "adminControls",
+            "sessionSelect",
+            "undoBtn",
+            "clearBtn",
+            "clearAllBtn",
+            "refreshBtn",
+            "modelCurrent",
+            "modelDropdown",
+            "fullscreenZone",
+            "sendMessage(",
+            "loadHistory(",
+            "syncGlobalModel(",
+            "/chat",
+            "/history",
+            "/global_model",
+        ]
+
+        missing = [m for m in required_markers if m not in html]
+        if missing:
+            raise ValueError(
+                "Модель сломала терминальную оболочку. "
+                "Попробуй более простую правку без переписывания логики интерфейса."
+            )
 
         return html
 
     def _system_prompt(self) -> str:
         return """
-Ты — один и тот же агент для браузера и терминала.
+Ты — агент веб-терминала.
 
 У тебя два режима:
 
 1) chat
-Если пользователь просто разговаривает, шутит, спрашивает мнение, обсуждает жизнь
-или задаёт вопрос не про изменение сайта — просто ответь текстом и НЕ меняй HTML.
+Если пользователь просто разговаривает, задаёт вопрос, шутит, просит мнение
+или не просит менять страницу — ответь текстом и НЕ меняй HTML.
 
 2) edit
-Если пользователь просит изменить сайт: фон, цвета, шрифты, кнопки, блоки, layout,
-контент, секции, карточки, отступы, заголовки — измени текущий HTML
-и верни ПОЛНЫЙ новый HTML целиком.
+Если пользователь просит изменить внешний вид, текст, блоки, секции, карточки,
+отступы, заголовки или layout — измени текущий HTML и верни ПОЛНЫЙ новый HTML целиком.
 
 Возвращай СТРОГО JSON и ничего кроме JSON:
+
 {
   "mode": "chat" или "edit",
   "assistant": "короткий ответ пользователю",
@@ -283,9 +313,24 @@ class Agent:
 - если mode = edit, поле html должно содержать полный HTML;
 - отвечай по-русски;
 - стиль по умолчанию минималистичный;
-- если пользователь не попросил другое, сохраняй спокойную PI-like эстетику;
+- если пользователь не просил другое, сохраняй спокойную PI-like эстетику;
 - если пользователь не просил другое, базовый фон держи в духе rgb(20, 40, 76).
-        """.strip()
+
+ВАЖНО ДЛЯ edit:
+- это рабочий интерфейс агента, не ломай его;
+- обязательно сохраняй существующую JS-логику;
+- не удаляй и не переименовывай fetch-запросы и системные функции;
+- обязательно сохраняй элементы/идентификаторы:
+  chatMessages, messageInput, sendLabel, pathDisplay, adminControls,
+  sessionSelect, undoBtn, clearBtn, clearAllBtn, refreshBtn,
+  modelCurrent, modelDropdown, fullscreenZone;
+- обязательно сохраняй функции:
+  sendMessage, loadHistory, syncGlobalModel, loadAdmin, loadPublic;
+- если задачу можно решить стилями, текстом или перестановкой блоков —
+  НЕ переписывай скрипты;
+- возвращай полный HTML-документ, начинающийся с <!doctype html>
+  и заканчивающийся </html>.
+""".strip()
 
     def _call_provider(self, provider: str, model: str, messages: list) -> str:
         provider = (provider or "").strip().lower()
@@ -360,13 +405,13 @@ class Agent:
 
         add_message(session["id"], "user", clean_message, None, None)
 
-        history = get_history(session["id"], limit=30)
+        history = get_history(session["id"], limit=20)
         compact_history = []
-        for item in history[-20:]:
+        for item in history[-10:]:
             role = "assistant" if item["role"] == "assistant" else "user"
             content = str(item["message"] or "").strip()
             if content:
-                compact_history.append({"role": role, "content": content[:1500]})
+                compact_history.append({"role": role, "content": content[:800]})
 
         current_html = read_session_html(session["id"])
 
@@ -415,7 +460,6 @@ class Agent:
 
 agent = Agent()
 
-
 # BEGIN GLOBAL_MODEL_OVERRIDE
 import json as _gmo_json
 from pathlib import Path as _gmo_Path
@@ -444,7 +488,6 @@ if not getattr(Agent.chat, "__name__", "") == "_agent_chat_with_global_model":
 
     Agent.chat = _agent_chat_with_global_model
 # END GLOBAL_MODEL_OVERRIDE
-
 
 # BEGIN CURATED_MODEL_OPTIONS
 def _cmo_dedupe(items):
