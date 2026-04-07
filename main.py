@@ -492,10 +492,14 @@ def admin_history():
 
     payload = request.get_json(silent=True) or {}
     session_name = str(payload.get("session") or "").strip()
-    if not session_name or not get_session(session_name):
+    if not session_name:
+        return jsonify({"success": False, "error": "session name required"}), 400
+
+    session = get_session(session_name)
+    if not session:
         return jsonify({"success": False, "error": "session not found"}), 404
 
-    history = get_history(session_name, limit=200)
+    history = get_history(session["id"], limit=200)
     return jsonify({"success": True, "history": history})
 
 @app.post("/admin/chat")
