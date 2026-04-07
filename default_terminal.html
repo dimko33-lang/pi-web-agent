@@ -9,7 +9,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&display=swap');
 
 :root{
-    --dock-right-gap:12px; /* отступ для названия модели от правого края */
+    --dock-right-pad:10px; /* общий правый отступ и для активной модели, и для списка */
 }
 
 html, body{
@@ -120,18 +120,18 @@ body{
 }
 
 #rightGroup{
-    margin-left: auto;  /* прижимает всё к правому краю */
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
+    margin-left:auto;
+    display:flex;
+    align-items:center;
+    gap:2px;              /* было 8px, сильно придвинуто к модели */
+    flex-shrink:0;
 }
 
 /* Публичные кнопки (только undo/redo) */
 #publicControls{
-    display: none;
-    align-items: center;
-    gap: 6px;
+    display:none;
+    align-items:center;
+    gap:3px;
 }
 
 #publicControls button{
@@ -167,7 +167,7 @@ body{
 #adminControls{
     display:none;
     align-items:center;
-    gap:4px;
+    gap:3px;              /* было 4px */
     min-width:0;
     flex:0 1 auto;
     overflow-x:auto;
@@ -235,6 +235,7 @@ body{
     width:150px;
     min-width:150px;
     max-width:150px;
+    margin-right:-10px;   /* прижимает модельный блок и дропдаун к правому краю */
 }
 
 #modelCurrent{
@@ -249,10 +250,11 @@ body{
     font-weight:500;
     opacity:0.68;
     text-align:right;
-    padding-right:var(--dock-right-gap); /* 12px от правого края */
+    padding-right:var(--dock-right-pad);
     cursor:pointer;
     letter-spacing:0.01em;
     font-style: italic;
+    user-select:none;
 }
 
 #modelCurrent.admin-clickable{
@@ -279,7 +281,7 @@ body{
 
 .model-option{
     position:relative;
-    padding:7px 8px 7px 10px; /* правый отступ 8px (не впритык, но меньше чем у названия) */
+    padding:7px var(--dock-right-pad) 7px 10px; /* выравнивание по правому краю как у нижней модели */
     color:rgba(255,255,255,0.72);
     font-size:10px;
     cursor:pointer;
@@ -387,10 +389,14 @@ body{
     }
 
     #rightGroup{
-        gap:6px;
+        gap:2px;
         max-width:calc(100vw - 112px);
-        flex-shrink: 1;
-        min-width: 0;
+        flex-shrink:1;
+        min-width:0;
+    }
+
+    #publicControls{
+        gap:2px;
     }
 
     #publicControls button{
@@ -402,7 +408,7 @@ body{
     }
 
     #adminControls{
-        gap:4px;
+        gap:2px;
         overflow-x:auto;
     }
 
@@ -433,6 +439,7 @@ body{
         width:118px;
         min-width:118px;
         max-width:118px;
+        margin-right:-10px;
     }
 
     #modelCurrent{
@@ -442,7 +449,7 @@ body{
     }
 
     .model-option{
-        padding-right:6px;
+        padding-right:8px;
     }
 
     #modelDropdown{
@@ -485,14 +492,15 @@ body{
 
 <div id="bottomBar">
   <div id="pathDisplay">~/projects/pi-ru</div>
+
   <div id="rightGroup">
-    <!-- Публичные кнопки (только undo/redo) -->
+    <!-- Публичные кнопки -->
     <div id="publicControls">
       <button id="publicUndoBtn" type="button">undo</button>
       <button id="publicRedoBtn" type="button">redo</button>
     </div>
 
-    <!-- Админские кнопки (полный набор) -->
+    <!-- Админские кнопки -->
     <div id="adminControls">
       <select id="sessionSelect"></select>
       <button id="undoBtn" type="button">undo</button>
@@ -501,9 +509,9 @@ body{
       <button id="refreshBtn" type="button">refresh</button>
     </div>
 
-    <!-- Блок выбора модели -->
+    <!-- Блок модели -->
     <div id="modelDock">
-      <div id="modelCurrent">Loading...</div>
+      <div id="modelCurrent"></div>
       <div id="modelDropdown"></div>
     </div>
   </div>
@@ -514,6 +522,8 @@ body{
 <script>
 const rawAlias = location.search.length > 1 ? decodeURIComponent(location.search.slice(1)) : '';
 const ADMIN_HEADER = rawAlias;
+
+const MODEL_LABEL_STORAGE_KEY = 'pi_last_model_label';
 
 const chatDiv = document.getElementById('chatMessages');
 const input = document.getElementById('messageInput');
@@ -539,7 +549,7 @@ let currentSession = 'default';
 let currentModel = {
   provider: 'groq',
   model: 'llama-3.1-8b-instant',
-  label: 'Groq · Llama 3.1 8B (fast/free)'
+  label: 'llama 3.1 8B'
 };
 let models = [];
 let poller = null;
@@ -659,6 +669,18 @@ function dropdownModelLabel(provider, name) {
   return `${providerShort(provider)}: ${humanModelName(name)}`;
 }
 
+function setVisibleModelLabel(label) {
+  const safe = String(label || '').trim();
+  if (!safe) return;
+  modelCurrent.textContent = safe;
+  localStorage.setItem(MODEL_LABEL_STORAGE_KEY, safe);
+}
+
+function seedModelLabelFromStorage() {
+  const saved = localStorage.getItem(MODEL_LABEL_STORAGE_KEY);
+  modelCurrent.textContent = saved || currentModel.label || 'model';
+}
+
 function setThinking(v) {
   sendLabel.classList.toggle('thinking', !!v);
   sendLabel.textContent = v ? '...' : 'Send';
@@ -743,7 +765,9 @@ function renderHistory(items) {
 
 function renderModelDock() {
   const rawName = currentModel.model || currentModel.label || '';
-  modelCurrent.textContent = currentModelLabel(currentModel.provider, rawName);
+  const label = currentModelLabel(currentModel.provider, rawName);
+
+  setVisibleModelLabel(label);
   modelCurrent.title = humanModelName(rawName);
   modelDropdown.innerHTML = '';
 
@@ -963,7 +987,6 @@ redoBtn.onclick = async () => {
   }
 };
 
-// Публичные кнопки
 publicUndoBtn.onclick = async () => {
   try {
     await api('POST', '/undo', {});
@@ -1028,6 +1051,8 @@ fsZone.addEventListener('click', () => {
 
 (async function init() {
   try {
+    seedModelLabelFromStorage();
+
     if (rawAlias.includes('-admin-')) {
       await loadAdmin();
     } else {
