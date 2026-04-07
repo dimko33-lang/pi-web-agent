@@ -9,10 +9,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
 :root{
-    --glass-bg:rgba(255,255,255,0.08);
-    --glass-bg-hover:rgba(255,255,255,0.12);
-    --glass-border:rgba(255,255,255,0.18);
-    --glass-border-strong:rgba(255,255,255,0.26);
     --dock-right-gap:5px;
 }
 
@@ -85,7 +81,7 @@ body{
     font-weight:500;
     cursor:pointer;
     user-select:none;
-    transition:color 0.2s,opacity 0.2s,transform 0.2s;
+    transition:color 0.2s, opacity 0.2s, transform 0.2s;
 }
 
 #sendLabel:hover{
@@ -98,9 +94,9 @@ body{
 }
 
 @keyframes pulseSend{
-    0% {opacity:.45;transform:translateY(0px);}
-    50% {opacity:1;transform:translateY(-1px);}
-    100% {opacity:.45;transform:translateY(0px);}
+    0% { opacity:.45; transform:translateY(0px); }
+    50% { opacity:1; transform:translateY(-1px); }
+    100% { opacity:.45; transform:translateY(0px); }
 }
 
 #bottomBar{
@@ -461,19 +457,23 @@ function cleanModelName(name) {
   return String(name || '')
     .replace(/^openrouter\s*[:·-]?\s*/i, '')
     .replace(/^open router\s*[:·-]?\s*/i, '')
-    .replace(/^groq\s*[:·-]?\s*/i, '')
     .trim();
 }
 
 function shortenLabel(provider, name) {
-  let p = String(provider || '').toLowerCase();
+  const raw = String(provider || '').trim();
+  const lower = raw.toLowerCase();
+  const modelName = String(name || '').trim();
 
-  if (p === 'openrouter') p = 'OR';
-  else if (p === 'groq') p = 'GQ';
-  else if (p === 'meta-llama') p = 'ML';
-  else p = p.toUpperCase();
+  if (lower === 'openrouter') {
+    return `OR: ${cleanModelName(modelName)}`;
+  }
 
-  return `${p}: ${cleanModelName(name)}`;
+  if (lower === 'groq') {
+    return `GROQ: ${modelName}`;
+  }
+
+  return `${raw}: ${modelName}`;
 }
 
 function setThinking(v) {
