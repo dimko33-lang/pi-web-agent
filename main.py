@@ -277,6 +277,19 @@ def undo():
     result = agent.undo(ctx["target_session"])
     return jsonify(result)
 
+@app.post("/redo")
+def redo():
+    ctx = resolve_context()
+    if not ctx.get("ok"):
+        return jsonify({"success": False, "error": "Session not found"}), 404
+
+    try:
+        result = agent.redo(ctx["target_session"])
+        code = 200 if result.get("success") else 400
+        return jsonify(result), code
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 @app.post("/chat")
 def chat():
     ctx = resolve_context()
@@ -517,6 +530,23 @@ def admin_undo():
         return jsonify({"success": False, "error": "session not found"}), 404
 
     return jsonify(agent.undo(session_name))
+
+@app.post("/admin/redo")
+def admin_redo():
+    if not _admin_is_ok():
+        return jsonify({"success": False, "error": "forbidden"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    session_name = str(payload.get("session") or "").strip()
+    if not session_name or not get_session(session_name):
+        return jsonify({"success": False, "error": "session not found"}), 404
+
+    try:
+        result = agent.redo(session_name)
+        code = 200 if result.get("success") else 400
+        return jsonify(result), code
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.post("/admin/clear_session")
 def admin_clear_session():
