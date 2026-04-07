@@ -1,200 +1,596 @@
-import sqlite3
 import json
 import time
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from urllib.parse import unquote
+
+from flask import Flask, Response, jsonify, request, make_response
+from werkzeug.middleware.proxy_fix import ProxyFix
+
+from agent import agent
+from db import (
+    get_history,
+    get_or_create_session,
+    get_session,
+    html_mtime_ns,
+    init_db,
+    last_message_id,
+    list_sessions,
+    read_session_html,
+)
+
+app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+init_db()
 
 APP_DIR = Path("/opt/my-agent")
-DB_PATH = APP_DIR / "agent.db"
-SESSIONS_DIR = APP_DIR / "sessions"
+ALIAS_FILE = APP_DIR / "session_aliases.json"
+LOCAL_IPS = {"127.0.0.1", "::1"}
 
-def init_db():
-    SESSIONS_DIR.mkdir(exist_ok=True)
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS sessions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT UNIQUE NOT NULL,
-                provider TEXT NOT NULL,
-                model TEXT NOT NULL,
-                created_at INTEGER NOT NULL
-            )
-        """)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS messages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id INTEGER NOT NULL,
-                role TEXT NOT NULL,
-                message TEXT,
-                provider TEXT,
-                model TEXT,
-                timestamp INTEGER NOT NULL,
-                FOREIGN KEY(session_id) REFERENCES sessions(id)
-            )
-        """)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS snapshots (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id INTEGER NOT NULL,
-                html TEXT NOT NULL,
-                created_at INTEGER NOT NULL,
-                FOREIGN KEY(session_id) REFERENCES sessions(id)
-            )
-        """)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS redo_snapshots (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id INTEGER NOT NULL,
-                html TEXT NOT NULL,
-                created_at INTEGER NOT NULL,
-                FOREIGN KEY(session_id) REFERENCES sessions(id)
-            )
-        """)
+PUBLIC_SESSIONS = {"default", "slot1", "slot2", "slot3", "slot4", "slot5"}
+
+def _pgm_load():
+    try:
+        with open(APP_DIR / "global_model.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        provider = str(data.get("provider") or "").strip()
+        model = str(data.get("model") or "").strip()
+        if provider and model:
+            return provider, model
+    except Exception:
+        pass
+    return "groq", "llama-3.1-8b-instant"
+
+def force_model_for_session(session_name: str):
+    if session_name in PUBLIC_SESSIONS:
+        provider, model = _pgm_load()
+        return provider, model
+    return None, None
+
+def load_aliases():
+    if not ALIAS_FILE.exists():
+        return {}
+    return json.loads(ALIAS_FILE.read_text(encoding="utf-8"))
+
+ALIAS_MAP = load_aliases()
+ADMIN_ALIAS = next((k for k, v in ALIAS_MAP.items() if v == "private"), None)
+
+def is_local_request():
+    return (request.remote_addr or "") in LOCAL_IPS
+
+def raw_query_alias():
+    raw = request.query_string.decode("utf-8", "ignore").strip()
+    return unquote(raw) if raw else ""
+
+def not_found_html():
+    return """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>404</title>
+  <style>
+    html,body{height:100%;margin:0}
+    body{
+      display:grid;
+      place-items:center;
+      background:#111;
+      color:#999;
+      font:14px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;
+    }
+  </style>
+</head>
+<body>404</body>
+</html>"""
+
+def resolve_context():
+    if is_local_request():
+        if request.method == "GET":
+            s = (request.args.get("session") or "").strip()
+        else:
+            payload = request.get_json(silent=True) or {}
+            s = str(payload.get("session") or request.args.get("session") or "").strip()
+        if s and get_session(s):
+            return {
+                "ok": True,
+                "admin": True,
+                "alias": "local",
+                "target_session": s,
+            }
+
+    alias = raw_query_alias() or (request.cookies.get("pi_alias") or "").strip()
+    if not alias or alias not in ALIAS_MAP:
+        return {"ok": False}
+
+    if alias == ADMIN_ALIAS:
+        target = (request.cookies.get("pi_target_session") or "private").strip() or "private"
+        if not get_session(target):
+            target = "private"
+        return {
+            "ok": True,
+            "admin": True,
+            "alias": alias,
+            "target_session": target,
+        }
+
+    target = ALIAS_MAP[alias]
+    if not get_session(target):
+        return {"ok": False}
+
+    return {
+        "ok": True,
+        "admin": False,
+        "alias": alias,
+        "target_session": target,
+    }
+
+@app.after_request
+def add_no_cache_headers(response):
+    if request.path in {"/", "/events"}:
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+    return response
+
+@app.get("/")
+def index():
+    alias = raw_query_alias()
+    if not alias or alias not in ALIAS_MAP:
+        return Response(not_found_html(), status=404, mimetype="text/html; charset=utf-8")
+
+    admin_mode = alias == ADMIN_ALIAS
+    target = (request.cookies.get("pi_target_session") or "private").strip() if admin_mode else ALIAS_MAP[alias]
+    if not get_session(target):
+        target = "private" if admin_mode else ALIAS_MAP[alias]
+
+    session = get_session(target)
+    html = read_session_html(session["id"])
+
+    resp = make_response(Response(html, mimetype="text/html; charset=utf-8"))
+    resp.set_cookie("pi_alias", alias, max_age=86400*30, httponly=False, samesite="Lax")
+    resp.set_cookie("pi_admin", "1" if admin_mode else "0", max_age=86400*30, httponly=False, samesite="Lax")
+    resp.set_cookie("pi_target_session", target, max_age=86400*30, httponly=False, samesite="Lax")
+    return resp
+
+@app.get("/healthz")
+def healthz():
+    return jsonify({
+        "ok": True,
+        "sessions": len(list_sessions()),
+        "aliases": len(ALIAS_MAP),
+        "admin_alias_exists": bool(ADMIN_ALIAS),
+    })
+
+@app.get("/me")
+def me():
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    ip = forwarded.split(",")[0].strip() if forwarded else (request.remote_addr or "127.0.0.1")
+    return jsonify({"ip": ip})
+
+@app.get("/models")
+def models():
+    return jsonify({"models": agent.model_options()})
+
+@app.get("/sessions")
+def sessions():
+    ctx = resolve_context()
+    if not ctx.get("ok") or not ctx.get("admin"):
+        return jsonify({"success": False, "error": "forbidden"}), 403
+
+    items = list_sessions()
+    return jsonify({
+        "success": True,
+        "sessions": [s["name"] for s in items],
+        "public_aliases": {k: v for k, v in ALIAS_MAP.items() if v in PUBLIC_SESSIONS},
+    })
+
+@app.post("/session_switch")
+def session_switch():
+    ctx = resolve_context()
+    if not ctx.get("ok") or not ctx.get("admin"):
+        return jsonify({"success": False, "error": "forbidden"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    target = str(payload.get("session") or "").strip()
+    if not target or not get_session(target):
+        return jsonify({"success": False, "error": "session not found"}), 404
+
+    resp = jsonify({"success": True, "target_session": target})
+    resp.set_cookie("pi_target_session", target, max_age=86400*30, httponly=False, samesite="Lax")
+    return resp
+
+@app.get("/session_info")
+def session_info():
+    ctx = resolve_context()
+    if not ctx.get("ok"):
+        return jsonify({"success": False, "error": "Session not found"}), 404
+
+    target = ctx["target_session"]
+    session = get_session(target)
+    forced = force_model_for_session(target)
+
+    provider = forced[0] if forced[0] else session["provider"]
+    model = forced[1] if forced[1] else session["model"]
+
+    return jsonify({
+        "success": True,
+        "admin_mode": bool(ctx["admin"]),
+        "alias": ctx["alias"],
+        "target_session": target,
+        "public_target": target in PUBLIC_SESSIONS,
+        "provider": provider,
+        "model": model,
+        "label": agent.label_for(provider, model),
+    })
+
+@app.post("/session_update")
+def session_update():
+    ctx = resolve_context()
+    if not ctx.get("ok") or not ctx.get("admin"):
+        return jsonify({"success": False, "error": "forbidden"}), 403
+
+    target = ctx["target_session"]
+    if target in PUBLIC_SESSIONS:
+        provider, model = _pgm_load()
+        return jsonify({
+            "success": False,
+            "error": f"Public sessions are fixed to the global model: {provider} / {model}"
+        }), 403
+
+    payload = request.get_json(silent=True) or {}
+    provider = str(payload.get("provider") or "").strip()
+    model = str(payload.get("model") or "").strip()
+    if not provider or not model:
+        return jsonify({"success": False, "error": "provider/model required"}), 400
+
+    session = agent.session_update(target, provider, model)
+    return jsonify({
+        "success": True,
+        "session": session["name"],
+        "provider": session["provider"],
+        "model": session["model"],
+        "label": agent.label_for(session["provider"], session["model"]),
+    })
+
+@app.post("/history")
+def history():
+    ctx = resolve_context()
+    if not ctx.get("ok"):
+        return jsonify({"success": False, "error": "Session not found"}), 404
+
+    session = get_session(ctx["target_session"])
+    return jsonify({"history": get_history(session["id"], limit=200)})
+
+@app.post("/clear_history")
+def clear_history():
+    ctx = resolve_context()
+    if not ctx.get("ok"):
+        return jsonify({"success": False, "error": "Session not found"}), 404
+
+    result = agent.clear(ctx["target_session"])
+    return jsonify(result)
+
+@app.post("/undo")
+def undo():
+    ctx = resolve_context()
+    if not ctx.get("ok"):
+        return jsonify({"success": False, "error": "Session not found"}), 404
+
+    result = agent.undo(ctx["target_session"])
+    return jsonify(result)
+
+@app.post("/redo")
+def redo():
+    ctx = resolve_context()
+    if not ctx.get("ok"):
+        return jsonify({"success": False, "error": "Session not found"}), 404
+
+    try:
+        result = agent.redo(ctx["target_session"])
+        code = 200 if result.get("success") else 400
+        return jsonify(result), code
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.post("/chat")
+def chat():
+    ctx = resolve_context()
+    if not ctx.get("ok"):
+        return jsonify({"success": False, "error": "Session not found"}), 404
+
+    payload = request.get_json(silent=True) or {}
+    message = str(payload.get("message") or "").strip()
+    if not message:
+        return jsonify({"success": False, "error": "Пустое сообщение"}), 400
+
+    target = ctx["target_session"]
+    forced = force_model_for_session(target)
+
+    if forced[0]:
+        provider, model = forced
+    else:
+        provider = str(payload.get("provider") or "").strip() or None
+        model = str(payload.get("specific_model") or payload.get("model") or "").strip() or None
+
+    try:
+        result = agent.chat(target, message, provider=provider, model=model)
+        code = 200 if result.get("success") else 500
+        return jsonify(result), code
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.get("/events")
+def events():
+    ctx = resolve_context()
+    if not ctx.get("ok"):
+        return Response("session not found", status=404, mimetype="text/plain")
+
+    session = get_session(ctx["target_session"])
+    sid = session["id"]
+
+    def stream():
+        last_msg = last_message_id(sid)
+        last_html = html_mtime_ns(sid)
+        ticks = 0
+
+        while True:
+            time.sleep(1)
+            ticks += 1
+
+            current_msg = last_message_id(sid)
+            current_html = html_mtime_ns(sid)
+
+            if current_msg != last_msg:
+                last_msg = current_msg
+                yield "event: messages\ndata: update\n\n"
+
+            if current_html != last_html:
+                last_html = current_html
+                yield "event: reload\ndata: update\n\n"
+
+            if ticks >= 15:
+                yield ": ping\n\n"
+                ticks = 0
+
+    return Response(
+        stream(),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+# ========== SHELL EXECUTION (без подтверждений) ==========
+import subprocess
+import shlex
+
+@app.post("/exec")
+def exec_command():
+    ctx = resolve_context()
+    if not ctx.get("ok") or not ctx.get("admin"):
+        return jsonify({"success": False, "error": "forbidden"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    command = str(payload.get("command") or "").strip()
+    if not command:
+        return jsonify({"success": False, "error": "empty command"}), 400
+
+    try:
+        result = subprocess.run(
+            shlex.split(command),
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd="/opt/my-agent"
+        )
+        output = result.stdout + result.stderr
+        if not output:
+            output = "(no output)"
+        from db import add_message
+        session = get_session(ctx["target_session"])
+        if session:
+            add_message(session["id"], "assistant", f"$ {command}\n{output}", "shell", "exec")
+        return jsonify({
+            "success": True,
+            "command": command,
+            "exit_code": result.returncode,
+            "output": output
+        })
+    except subprocess.TimeoutExpired:
+        return jsonify({"success": False, "error": "Command timed out after 30 seconds"}), 408
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# ========== ADMIN API ==========
+import json as _admin_json
+import sqlite3 as _admin_sqlite3
+from pathlib import Path as _admin_Path
+
+_ADMIN_APP = _admin_Path("/opt/my-agent")
+_ADMIN_ALIAS_FILE = _ADMIN_APP / "session_aliases.json"
+_ADMIN_GLOBAL_FILE = _ADMIN_APP / "global_model.json"
+_ADMIN_DB_FILE = _ADMIN_APP / "agent.db"
+
+def _admin_alias():
+    try:
+        aliases = _admin_json.loads(_ADMIN_ALIAS_FILE.read_text(encoding="utf-8"))
+        return next((k for k, v in aliases.items() if v == "private"), None)
+    except Exception:
+        return None
+
+def _admin_is_ok():
+    hdr = (request.headers.get("X-Admin-Alias") or "").strip()
+    raw = request.query_string.decode("utf-8", "ignore").strip()
+    cookie = (request.cookies.get("pi_alias") or "").strip()
+    local = (request.remote_addr or "") in {"127.0.0.1", "::1"}
+    aa = _admin_alias()
+    return local or (aa and (hdr == aa or raw == aa or cookie == aa))
+
+def _admin_load_global_model():
+    try:
+        data = _admin_json.loads(_ADMIN_GLOBAL_FILE.read_text(encoding="utf-8"))
+        provider = str(data.get("provider") or "").strip()
+        model = str(data.get("model") or "").strip()
+        if provider and model:
+            return {"provider": provider, "model": model}
+    except Exception:
+        pass
+    return {"provider": "groq", "model": "llama-3.1-8b-instant"}
+
+def _admin_save_global_model(provider: str, model: str):
+    data = {"provider": provider, "model": model}
+    _ADMIN_GLOBAL_FILE.write_text(_admin_json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    return data
+
+def _admin_db_exec(sql, params=()):
+    with _admin_sqlite3.connect(_ADMIN_DB_FILE) as conn:
+        conn.execute(sql, params)
         conn.commit()
 
-def get_or_create_session(name: str, provider: str = "groq", model: str = "llama-3.1-8b-instant") -> Dict[str, Any]:
-    with sqlite3.connect(DB_PATH) as conn:
-        cur = conn.execute("SELECT id, name, provider, model, created_at FROM sessions WHERE name = ?", (name,))
-        row = cur.fetchone()
-        if row:
-            return {"id": row[0], "name": row[1], "provider": row[2], "model": row[3], "created_at": row[4]}
-        now = int(time.time())
-        cur = conn.execute(
-            "INSERT INTO sessions (name, provider, model, created_at) VALUES (?, ?, ?, ?)",
-            (name, provider, model, now)
-        )
-        return {"id": cur.lastrowid, "name": name, "provider": provider, "model": model, "created_at": now}
+@app.get("/admin/state")
+def admin_state():
+    if not _admin_is_ok():
+        return jsonify({"success": False, "error": "forbidden"}), 403
 
-def get_session(name: str) -> Optional[Dict[str, Any]]:
-    with sqlite3.connect(DB_PATH) as conn:
-        cur = conn.execute("SELECT id, name, provider, model, created_at FROM sessions WHERE name = ?", (name,))
-        row = cur.fetchone()
-        if row:
-            return {"id": row[0], "name": row[1], "provider": row[2], "model": row[3], "created_at": row[4]}
-    return None
+    sessions = [s["name"] for s in list_sessions()]
+    gm = _admin_load_global_model()
 
-def get_session_by_id(session_id: int) -> Optional[Dict[str, Any]]:
-    with sqlite3.connect(DB_PATH) as conn:
-        cur = conn.execute("SELECT id, name, provider, model, created_at FROM sessions WHERE id = ?", (session_id,))
-        row = cur.fetchone()
-        if row:
-            return {"id": row[0], "name": row[1], "provider": row[2], "model": row[3], "created_at": row[4]}
-    return None
+    return jsonify({
+        "success": True,
+        "admin_alias": _admin_alias(),
+        "sessions": sessions,
+        "global_model": {
+            "provider": gm["provider"],
+            "model": gm["model"],
+            "label": agent.label_for(gm["provider"], gm["model"]),
+        }
+    })
 
-def list_sessions() -> List[Dict[str, Any]]:
-    with sqlite3.connect(DB_PATH) as conn:
-        cur = conn.execute("SELECT id, name, provider, model, created_at FROM sessions ORDER BY name")
-        return [{"id": r[0], "name": r[1], "provider": r[2], "model": r[3], "created_at": r[4]} for r in cur]
+@app.post("/admin/set_model")
+def admin_set_model():
+    if not _admin_is_ok():
+        return jsonify({"success": False, "error": "forbidden"}), 403
 
-def update_session_state(session_id: int, provider: str, model: str) -> Dict[str, Any]:
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute("UPDATE sessions SET provider = ?, model = ? WHERE id = ?", (provider, model, session_id))
-    return get_session_by_id(session_id)
+    payload = request.get_json(silent=True) or {}
+    provider = str(payload.get("provider") or "").strip()
+    model = str(payload.get("model") or "").strip()
 
-def session_html_path(session_id: int) -> Path:
-    return SESSIONS_DIR / f"session_{session_id}.html"
+    if not provider or not model:
+        return jsonify({"success": False, "error": "provider/model required"}), 400
 
-def read_session_html(session_id: int) -> str:
-    path = session_html_path(session_id)
-    if path.exists():
-        return path.read_text(encoding="utf-8")
-    default = APP_DIR / "default_terminal.html"
-    if default.exists():
-        return default.read_text(encoding="utf-8")
-    return "<!doctype html><html><body>Error: no template</body></html>"
+    gm = _admin_save_global_model(provider, model)
+    return jsonify({
+        "success": True,
+        "provider": gm["provider"],
+        "model": gm["model"],
+        "label": agent.label_for(gm["provider"], gm["model"]),
+    })
 
-def take_snapshot(session_id: int, html: str):
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute(
-            "INSERT INTO snapshots (session_id, html, created_at) VALUES (?, ?, ?)",
-            (session_id, html, int(time.time()))
-        )
+@app.post("/admin/history")
+def admin_history():
+    if not _admin_is_ok():
+        return jsonify({"success": False, "error": "forbidden"}), 403
 
-def push_redo_snapshot(session_id: int, html: str):
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute(
-            "INSERT INTO redo_snapshots (session_id, html, created_at) VALUES (?, ?, ?)",
-            (session_id, html, int(time.time()))
-        )
+    payload = request.get_json(silent=True) or {}
+    session_name = str(payload.get("session") or "").strip()
+    if not session_name or not get_session(session_name):
+        return jsonify({"success": False, "error": "session not found"}), 404
 
-def clear_redo_snapshots(session_id: int):
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute("DELETE FROM redo_snapshots WHERE session_id = ?", (session_id,))
+    history = get_history(session_name, limit=200)
+    return jsonify({"success": True, "history": history})
 
-def undo_last_snapshot(session_id: int) -> bool:
-    with sqlite3.connect(DB_PATH) as conn:
-        cur = conn.execute(
-            "SELECT id, html FROM snapshots WHERE session_id = ? ORDER BY created_at DESC LIMIT 1",
-            (session_id,)
-        )
-        row = cur.fetchone()
-        if not row:
-            return False
-        snap_id, old_html = row
-        current_html = read_session_html(session_id)
-        conn.execute(
-            "INSERT INTO redo_snapshots (session_id, html, created_at) VALUES (?, ?, ?)",
-            (session_id, current_html, int(time.time()))
-        )
-        path = session_html_path(session_id)
-        path.write_text(old_html, encoding="utf-8")
-        conn.execute("DELETE FROM snapshots WHERE id = ?", (snap_id,))
-        return True
+@app.post("/admin/chat")
+def admin_chat():
+    if not _admin_is_ok():
+        return jsonify({"success": False, "error": "forbidden"}), 403
 
-def redo_last_snapshot(session_id: int) -> bool:
-    with sqlite3.connect(DB_PATH) as conn:
-        cur = conn.execute(
-            "SELECT id, html FROM redo_snapshots WHERE session_id = ? ORDER BY created_at DESC LIMIT 1",
-            (session_id,)
-        )
-        row = cur.fetchone()
-        if not row:
-            return False
-        redo_id, redo_html = row
-        current_html = read_session_html(session_id)
-        conn.execute(
-            "INSERT INTO snapshots (session_id, html, created_at) VALUES (?, ?, ?)",
-            (session_id, current_html, int(time.time()))
-        )
-        path = session_html_path(session_id)
-        path.write_text(redo_html, encoding="utf-8")
-        conn.execute("DELETE FROM redo_snapshots WHERE id = ?", (redo_id,))
-        return True
+    payload = request.get_json(silent=True) or {}
+    session_name = str(payload.get("session") or "").strip()
+    message = str(payload.get("message") or "").strip()
 
-def save_session_html(session_id: int, new_html: str):
-    current_html = read_session_html(session_id)
-    if current_html == new_html:
-        return
-    take_snapshot(session_id, current_html)
-    clear_redo_snapshots(session_id)
-    path = session_html_path(session_id)
-    path.write_text(new_html, encoding="utf-8")
+    if not session_name or not get_session(session_name):
+        return jsonify({"success": False, "error": "session not found"}), 404
+    if not message:
+        return jsonify({"success": False, "error": "empty message"}), 400
 
-def clear_history(session_id: int):
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
+    try:
+        result = agent.chat(session_name, message)
+        code = 200 if result.get("success") else 500
+        return jsonify(result), code
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
-def get_history(session_id: int, limit: int = 200) -> List[Dict]:
-    with sqlite3.connect(DB_PATH) as conn:
-        cur = conn.execute(
-            "SELECT id, role, message, provider, model, timestamp FROM messages WHERE session_id = ? ORDER BY timestamp ASC LIMIT ?",
-            (session_id, limit)
-        )
-        return [{"id": r[0], "role": r[1], "message": r[2], "provider": r[3], "model": r[4], "timestamp": r[5]} for r in cur]
+@app.post("/admin/undo")
+def admin_undo():
+    if not _admin_is_ok():
+        return jsonify({"success": False, "error": "forbidden"}), 403
 
-def add_message(session_id: int, role: str, message: str, provider: str = None, model: str = None):
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute(
-            "INSERT INTO messages (session_id, role, message, provider, model, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
-            (session_id, role, message, provider, model, int(time.time()))
-        )
+    payload = request.get_json(silent=True) or {}
+    session_name = str(payload.get("session") or "").strip()
+    if not session_name or not get_session(session_name):
+        return jsonify({"success": False, "error": "session not found"}), 404
 
-def last_message_id(session_id: int) -> int:
-    with sqlite3.connect(DB_PATH) as conn:
-        cur = conn.execute("SELECT MAX(id) FROM messages WHERE session_id = ?", (session_id,))
-        row = cur.fetchone()
-        return row[0] if row and row[0] else 0
+    return jsonify(agent.undo(session_name))
 
-def html_mtime_ns(session_id: int) -> int:
-    path = session_html_path(session_id)
-    return int(path.stat().st_mtime_ns) if path.exists() else 0
+@app.post("/admin/redo")
+def admin_redo():
+    if not _admin_is_ok():
+        return jsonify({"success": False, "error": "forbidden"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    session_name = str(payload.get("session") or "").strip()
+    if not session_name or not get_session(session_name):
+        return jsonify({"success": False, "error": "session not found"}), 404
+
+    try:
+        result = agent.redo(session_name)
+        code = 200 if result.get("success") else 400
+        return jsonify(result), code
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.post("/admin/clear_session")
+def admin_clear_session():
+    if not _admin_is_ok():
+        return jsonify({"success": False, "error": "forbidden"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    session_name = str(payload.get("session") or "").strip()
+    if not session_name or not get_session(session_name):
+        return jsonify({"success": False, "error": "session not found"}), 404
+
+    return jsonify(agent.clear(session_name))
+
+@app.post("/admin/delete_message")
+def admin_delete_message():
+    if not _admin_is_ok():
+        return jsonify({"success": False, "error": "forbidden"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    try:
+        msg_id = int(payload.get("id"))
+    except Exception:
+        return jsonify({"success": False, "error": "bad message id"}), 400
+
+    _admin_db_exec("DELETE FROM messages WHERE id = ?", (msg_id,))
+    return jsonify({"success": True, "deleted_id": msg_id})
+
+@app.post("/admin/clear_all_histories")
+def admin_clear_all_histories():
+    if not _admin_is_ok():
+        return jsonify({"success": False, "error": "forbidden"}), 403
+
+    _admin_db_exec("DELETE FROM messages")
+    return jsonify({"success": True, "cleared": "all_histories"})
+
+@app.get("/global_model")
+def global_model():
+    provider, model = _pgm_load()
+    return jsonify({
+        "success": True,
+        "provider": provider,
+        "model": model,
+        "label": agent.label_for(provider, model),
+    })
+
+if __name__ == "__main__":
+    app.run(host="127.0.0.1", port=8000, debug=True)
