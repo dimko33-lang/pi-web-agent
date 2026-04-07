@@ -20,7 +20,6 @@ from db import (
     update_session_state,
 )
 
-# Ключевое слово для активации команд (можно менять)
 COMMAND_PREFIX = "Ким"
 
 class Agent:
@@ -269,6 +268,7 @@ class Agent:
 - Никаких пояснений вне JSON.
 - Если пользователь не произнёс "{COMMAND_PREFIX}", ты не имеешь права использовать режимы shell/edit_css/edit_full.
 - Отвечай по-русски.
+- НИКОГДА не удаляй и не переименовывай элементы управления: кнопки undo, redo, clear, refresh, выпадающий список сессий, блок модели. Обязательно сохраняй их в неизменном виде.
 """.strip()
 
     def _call_provider(self, provider: str, model: str, messages: list) -> str:
@@ -296,7 +296,6 @@ class Agent:
         else:
             raise RuntimeError(f"Неизвестный provider: {provider}")
         payload = {"model": model, "messages": messages}
-        # Здесь можно добавить параметры temperature и max_tokens, если они будут сохранены в конфиге
         resp = requests.post(url, headers=headers, json=payload, timeout=self.timeout)
         if not resp.ok:
             try:
@@ -313,7 +312,7 @@ class Agent:
         if not clean_message:
             return {"success": False, "error": "Пустое сообщение"}
 
-        # Проверяем, есть ли имя агента в начале сообщения или как обращение
+        # Проверяем наличие ключевого слова
         lower_msg = clean_message.lower()
         prefix_lower = COMMAND_PREFIX.lower()
         has_command_keyword = (lower_msg.startswith(prefix_lower + " ") or 
@@ -321,33 +320,16 @@ class Agent:
                                f" {prefix_lower} " in lower_msg or
                                lower_msg.endswith(f" {prefix_lower}"))
 
-        # Если ключевого слова нет — принудительно переводим в режим chat (простой разговор)
-        if not has_command_keyword:
-            # Сохраняем сообщение пользователя
-            session = self.ensure_session(session_name, provider=provider, model=model)
-            add_message(session["id"], "user", clean_message, None, None)
-            # Отвечаем простым текстом без вызова модели (экономит токены)
-            reply_text = f"Я тебя слышу, но я выполняю команды только если ты обратишься ко мне по имени: «{COMMAND_PREFIX}». Например: «{COMMAND_PREFIX}, поменяй фон на чёрный» или «{COMMAND_PREFIX}, выполни ls -la»."
-            add_message(session["id"], "assistant", reply_text, session["provider"], session["model"])
-            return {
-                "success": True,
-                "reply": reply_text,
-                "changed": False,
-                "provider": session["provider"],
-                "model": session["model"],
-                "label": self.label_for(session["provider"], session["model"]),
-            }
+        if has_command_keyword:
+            modified_message = re.sub(rf'^{COMMAND_PREFIX}[,\s]+', '', clean_message, flags=re.IGNORECASE)
+            modified_message = re.sub(rf'\s+{COMMAND_PREFIX}[,\s]*$', '', modified_message, flags=re.IGNORECASE)
+            modified_message = re.sub(rf'\s+{COMMAND_PREFIX}[,\s]+', ' ', modified_message, flags=re.IGNORECASE)
+            modified_message = modified_message.strip()
+            if not modified_message:
+                modified_message = "привет"
+        else:
+            modified_message = clean_message
 
-        # Удаляем ключевое слово из сообщения, чтобы модель не путалась
-        # Удаляем "Ким" в начале, с запятой или пробелом
-        modified_message = re.sub(rf'^{COMMAND_PREFIX}[,\s]+', '', clean_message, flags=re.IGNORECASE)
-        modified_message = re.sub(rf'\s+{COMMAND_PREFIX}[,\s]*$', '', modified_message, flags=re.IGNORECASE)
-        modified_message = re.sub(rf'\s+{COMMAND_PREFIX}[,\s]+', ' ', modified_message, flags=re.IGNORECASE)
-        modified_message = modified_message.strip()
-        if not modified_message:
-            modified_message = "привет"  # если было только имя
-
-        # Далее идёт обычная логика с вызовом модели
         lower = modified_message.lower()
         if lower in {"/undo", "undo", "откати назад", "откатить назад", "верни назад", "верни как было"}:
             return self.undo(session_name)
@@ -408,7 +390,7 @@ class Agent:
         assistant_text = str(data.get("assistant") or "").strip() or "Готово."
         changed = False
 
-        if mode == "shell":
+        if mode == "shell" and has_command_keyword:
             command = data.get("command", "").strip()
             if command:
                 exec_result = self._execute_command(command)
@@ -424,20 +406,43 @@ class Agent:
                     "label": self.label_for(provider, model),
                 }
 
-        elif mode == "edit_css":
+        elif mode == "edit_css" and has_command_keyword:
             css = data.get("css", "").strip()
             if css:
                 new_html = self._apply_css_to_html(current_html, css)
+                # Проверка на сохранение кнопок undo/redo перед сохранением
+                if not self._check_html_integrity(new_html):
+                    error_msg = "Попытка сохранить HTML без кнопок undo/redo. Отказано."
+                    add_message(session["id"], "assistant", error_msg, provider, model)
+                    return {
+                        "success": False,
+                        "reply": error_msg,
+                        "changed": False,
+                        "provider": provider,
+                        "model": model,
+                        "label": self.label_for(provider, model),
+                    }
                 save_session_html(session["id"], new_html)
                 changed = True
                 assistant_text = "CSS обновлён."
             else:
                 assistant_text = "Не удалось применить CSS (пустая строка)."
 
-        elif mode == "edit_full":
+        elif mode == "edit_full" and has_command_keyword:
             html = str(data.get("html") or "").strip()
             if html:
                 new_html = self._extract_html(html)
+                if not self._check_html_integrity(new_html):
+                    error_msg = "Попытка сохранить HTML без кнопок undo/redo. Отказано."
+                    add_message(session["id"], "assistant", error_msg, provider, model)
+                    return {
+                        "success": False,
+                        "reply": error_msg,
+                        "changed": False,
+                        "provider": provider,
+                        "model": model,
+                        "label": self.label_for(provider, model),
+                    }
                 save_session_html(session["id"], new_html)
                 changed = True
                 assistant_text = assistant_text or "HTML обновлён."
@@ -466,10 +471,27 @@ class Agent:
             raise ValueError("Ответ не похож на полный HTML")
         return html
 
+    def _check_html_integrity(self, html: str) -> bool:
+        """Проверяет, что важные элементы интерфейса (кнопки undo/redo) присутствуют."""
+        required_ids = [
+            "undoBtn",
+            "redoBtn",
+            "clearBtn",
+            "refreshBtn",
+            "sessionSelect",
+            "modelCurrent",
+            "messageInput",
+            "sendLabel",
+        ]
+        for elem_id in required_ids:
+            if elem_id not in html:
+                return False
+        return True
+
 
 agent = Agent()
 
-# GLOBAL_MODEL_OVERRIDE (оставляем как было)
+# GLOBAL_MODEL_OVERRIDE
 import json as _gmo_json
 from pathlib import Path as _gmo_Path
 _GMO_FILE = _gmo_Path("/opt/my-agent/global_model.json")
@@ -492,7 +514,7 @@ if not getattr(Agent.chat, "__name__", "") == "_agent_chat_with_global_model":
         return _AGENT_CHAT_ORIG(self, session_name, message, provider=provider, model=model)
     Agent.chat = _agent_chat_with_global_model
 
-# CURATED_MODEL_OPTIONS (оставляем как есть, без изменений)
+# CURATED_MODEL_OPTIONS (сокращённо, как в оригинале)
 def _cmo_dedupe(items):
     out = []
     seen = set()
