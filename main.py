@@ -27,29 +27,41 @@ APP_DIR = Path("/opt/my-agent")
 ALIAS_FILE = APP_DIR / "session_aliases.json"
 LOCAL_IPS = {"127.0.0.1", "::1"}
 
-FIXED_PUBLIC_PROVIDER = "groq"
-FIXED_PUBLIC_MODEL = "llama-3.1-8b-instant"
 PUBLIC_SESSIONS = {"default", "slot1", "slot2", "slot3", "slot4", "slot5"}
 
+# === Глобальная модель для public сессий ===
+def _pgm_load():
+    try:
+        with open(APP_DIR / "global_model.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        provider = str(data.get("provider") or "").strip()
+        model = str(data.get("model") or "").strip()
+        if provider and model:
+            return provider, model
+    except Exception:
+        pass
+    return "groq", "llama-3.1-8b-instant"
+
+def force_model_for_session(session_name: str):
+    if session_name in PUBLIC_SESSIONS:
+        provider, model = _pgm_load()
+        return provider, model
+    return None, None
 
 def load_aliases():
     if not ALIAS_FILE.exists():
         return {}
     return json.loads(ALIAS_FILE.read_text(encoding="utf-8"))
 
-
 ALIAS_MAP = load_aliases()
 ADMIN_ALIAS = next((k for k, v in ALIAS_MAP.items() if v == "private"), None)
-
 
 def is_local_request():
     return (request.remote_addr or "") in LOCAL_IPS
 
-
 def raw_query_alias():
     raw = request.query_string.decode("utf-8", "ignore").strip()
     return unquote(raw) if raw else ""
-
 
 def not_found_html():
     return """<!doctype html>
@@ -71,22 +83,13 @@ def not_found_html():
 <body>404</body>
 </html>"""
 
-
-def force_model_for_session(session_name: str):
-    if session_name in PUBLIC_SESSIONS:
-        return FIXED_PUBLIC_PROVIDER, FIXED_PUBLIC_MODEL
-    return None, None
-
-
 def resolve_context():
-    # local terminal/CLI/admin on server
     if is_local_request():
         if request.method == "GET":
             s = (request.args.get("session") or "").strip()
         else:
             payload = request.get_json(silent=True) or {}
             s = str(payload.get("session") or request.args.get("session") or "").strip()
-
         if s and get_session(s):
             return {
                 "ok": True,
@@ -121,14 +124,12 @@ def resolve_context():
         "target_session": target,
     }
 
-
 @app.after_request
 def add_no_cache_headers(response):
     if request.path in {"/", "/events"}:
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
     return response
-
 
 @app.get("/")
 def index():
@@ -150,7 +151,6 @@ def index():
     resp.set_cookie("pi_target_session", target, max_age=86400*30, httponly=False, samesite="Lax")
     return resp
 
-
 @app.get("/healthz")
 def healthz():
     return jsonify({
@@ -160,18 +160,15 @@ def healthz():
         "admin_alias_exists": bool(ADMIN_ALIAS),
     })
 
-
 @app.get("/me")
 def me():
     forwarded = request.headers.get("X-Forwarded-For", "")
     ip = forwarded.split(",")[0].strip() if forwarded else (request.remote_addr or "127.0.0.1")
     return jsonify({"ip": ip})
 
-
 @app.get("/models")
 def models():
     return jsonify({"models": agent.model_options()})
-
 
 @app.get("/sessions")
 def sessions():
@@ -185,7 +182,6 @@ def sessions():
         "sessions": [s["name"] for s in items],
         "public_aliases": {k: v for k, v in ALIAS_MAP.items() if v in PUBLIC_SESSIONS},
     })
-
 
 @app.post("/session_switch")
 def session_switch():
@@ -201,7 +197,6 @@ def session_switch():
     resp = jsonify({"success": True, "target_session": target})
     resp.set_cookie("pi_target_session", target, max_age=86400*30, httponly=False, samesite="Lax")
     return resp
-
 
 @app.get("/session_info")
 def session_info():
@@ -227,7 +222,6 @@ def session_info():
         "label": agent.label_for(provider, model),
     })
 
-
 @app.post("/session_update")
 def session_update():
     ctx = resolve_context()
@@ -236,9 +230,10 @@ def session_update():
 
     target = ctx["target_session"]
     if target in PUBLIC_SESSIONS:
+        provider, model = _pgm_load()
         return jsonify({
             "success": False,
-            "error": "Public sessions are fixed to Groq Llama 3.1 8B."
+            "error": f"Public sessions are fixed to the global model: {provider} / {model}"
         }), 403
 
     payload = request.get_json(silent=True) or {}
@@ -256,7 +251,6 @@ def session_update():
         "label": agent.label_for(session["provider"], session["model"]),
     })
 
-
 @app.post("/history")
 def history():
     ctx = resolve_context()
@@ -265,7 +259,6 @@ def history():
 
     session = get_session(ctx["target_session"])
     return jsonify({"history": get_history(session["id"], limit=200)})
-
 
 @app.post("/clear_history")
 def clear_history():
@@ -276,7 +269,6 @@ def clear_history():
     result = agent.clear(ctx["target_session"])
     return jsonify(result)
 
-
 @app.post("/undo")
 def undo():
     ctx = resolve_context()
@@ -285,7 +277,6 @@ def undo():
 
     result = agent.undo(ctx["target_session"])
     return jsonify(result)
-
 
 @app.post("/chat")
 def chat():
@@ -313,7 +304,6 @@ def chat():
         return jsonify(result), code
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
-
 
 @app.get("/events")
 def events():
@@ -356,7 +346,6 @@ def events():
             "X-Accel-Buffering": "no",
         },
     )
-
 
 # BEGIN SAFE_ADMIN_API
 import json as _admin_json
@@ -469,8 +458,12 @@ def admin_chat():
     if not message:
         return jsonify({"success": False, "error": "empty message"}), 400
 
-    result = agent.chat(session_name, message)
-    return jsonify(result)
+    try:
+        result = agent.chat(session_name, message)
+        code = 200 if result.get("success") else 500
+        return jsonify(result), code
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.post("/admin/undo")
 def admin_undo():
@@ -520,30 +513,14 @@ def admin_clear_all_histories():
 # END SAFE_ADMIN_API
 
 # BEGIN PUBLIC_GLOBAL_MODEL_ENDPOINT
-import json as _pgm_json
-from pathlib import Path as _pgm_Path
-
-_PGM_FILE = _pgm_Path("/opt/my-agent/global_model.json")
-
-def _pgm_load():
-    try:
-        data = _pgm_json.loads(_PGM_FILE.read_text(encoding="utf-8"))
-        provider = str(data.get("provider") or "").strip()
-        model = str(data.get("model") or "").strip()
-        if provider and model:
-            return {"provider": provider, "model": model}
-    except Exception:
-        pass
-    return {"provider": "groq", "model": "llama-3.1-8b-instant"}
-
 @app.get("/global_model")
 def global_model():
-    gm = _pgm_load()
+    provider, model = _pgm_load()
     return jsonify({
         "success": True,
-        "provider": gm["provider"],
-        "model": gm["model"],
-        "label": agent.label_for(gm["provider"], gm["model"]),
+        "provider": provider,
+        "model": model,
+        "label": agent.label_for(provider, model),
     })
 # END PUBLIC_GLOBAL_MODEL_ENDPOINT
 
