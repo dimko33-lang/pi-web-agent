@@ -318,6 +318,7 @@ class Agent:
         provider = session["provider"]
         model = session["model"]
 
+        # Сохраняем сообщение пользователя
         add_message(session["id"], "user", clean_message, None, None)
 
         history = get_history(session["id"], limit=20)
@@ -348,8 +349,22 @@ class Agent:
             },
         ]
 
-        raw_reply = self._call_provider(provider, model, messages)
-        data = self._extract_json(raw_reply)
+        try:
+            raw_reply = self._call_provider(provider, model, messages)
+            data = self._extract_json(raw_reply)
+        except Exception as e:
+            # Если модель вернула мусор, отвечаем ошибкой, но сохраняем assistant сообщение
+            error_text = f"Ошибка обработки ответа модели: {str(e)}"
+            add_message(session["id"], "assistant", error_text, provider, model)
+            return {
+                "success": False,
+                "reply": error_text,
+                "changed": False,
+                "provider": provider,
+                "model": model,
+                "label": self.label_for(provider, model),
+                "error": str(e)
+            }
 
         mode = str(data.get("mode") or "chat").strip().lower()
         assistant_text = str(data.get("assistant") or "").strip() or "Готово."
@@ -389,6 +404,7 @@ class Agent:
                 changed = True
                 assistant_text = assistant_text or "HTML обновлён."
 
+        # ВСЕГДА сохраняем ответ ассистента
         add_message(session["id"], "assistant", assistant_text, provider, model)
         return {
             "success": True,
@@ -439,7 +455,7 @@ if not getattr(Agent.chat, "__name__", "") == "_agent_chat_with_global_model":
         return _AGENT_CHAT_ORIG(self, session_name, message, provider=provider, model=model)
     Agent.chat = _agent_chat_with_global_model
 
-# CURATED_MODEL_OPTIONS
+# CURATED_MODEL_OPTIONS (оставлен как был, без изменений)
 def _cmo_dedupe(items):
     out = []
     seen = set()
@@ -460,7 +476,6 @@ def _cmo_or_label(item):
 
 def _cmo_model_options(self):
     items = []
-    # ----- GROQ -----
     groq_order = [
         "qwen-qwq-32b",
         "llama3-8b-8192",
@@ -517,7 +532,6 @@ def _cmo_model_options(self):
                     "model": mid,
                 })
 
-    # ----- OPENROUTER -----
     if self.openrouter_key:
         or_items = []
         try:
@@ -568,7 +582,6 @@ def _cmo_model_options(self):
             if free_added >= 20:
                 break
 
-    # ----- KIMI direct -----
     if self.kimi_key:
         items.extend([
             {"name": "Kimi · K2.5", "provider": "kimi", "model": "kimi-k2.5"},
