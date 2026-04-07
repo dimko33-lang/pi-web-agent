@@ -359,7 +359,7 @@ def events():
         },
     )
 
-# ========== SHELL EXECUTION (без подтверждений) ==========
+# ========== SHELL EXECUTION ==========
 import subprocess
 import shlex
 
