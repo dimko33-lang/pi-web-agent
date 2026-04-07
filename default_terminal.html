@@ -6,7 +6,7 @@
 <title>~/projects/pi-ru</title>
 
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&display=swap');
 
 :root{
     --dock-right-gap:5px;
@@ -19,15 +19,11 @@ html, body{
 }
 
 body{
-    background:
-        radial-gradient(1100px 620px at 108% -8%, rgba(86,102,168,0.18), transparent 56%),
-        radial-gradient(900px 540px at -8% 108%, rgba(70,82,136,0.11), transparent 60%),
-        linear-gradient(180deg, rgba(255,255,255,0.018), rgba(255,255,255,0)),
-        rgb(20,20,25);
+    background: rgb(20,20,25);
     color:#fff;
     font-family:'Inter',system-ui,sans-serif;
+    font-style: italic;
     font-weight:400;
-    font-style:normal;
     overflow:hidden;
     -webkit-font-smoothing:antialiased;
     -moz-osx-font-smoothing:grayscale;
@@ -65,11 +61,12 @@ body{
     resize:none;
     line-height:1.4;
     overflow-y:auto;
+    font-style: italic;
 }
 
 #messageInput::placeholder{
     color:rgba(255,255,255,0.25);
-    font-style:normal;
+    font-style: italic;
 }
 
 #sendLabel{
@@ -82,6 +79,7 @@ body{
     cursor:pointer;
     user-select:none;
     transition:color 0.2s, opacity 0.2s, transform 0.2s;
+    font-style: italic;
 }
 
 #sendLabel:hover{
@@ -118,6 +116,7 @@ body{
     white-space:nowrap;
     flex:0 0 auto;
     letter-spacing:0.01em;
+    font-style: italic;
 }
 
 #adminControls{
@@ -138,7 +137,7 @@ body{
     border-radius:2px;
     font-family:'Inter',system-ui,sans-serif;
     font-size:10px;
-    font-style:normal;
+    font-style: italic;
     font-weight:500;
     letter-spacing:0.02em;
     backdrop-filter:blur(4px);
@@ -202,6 +201,7 @@ body{
     padding-right:var(--dock-right-gap);
     cursor:pointer;
     letter-spacing:0.01em;
+    font-style: italic;
 }
 
 #modelCurrent.admin-clickable{
@@ -237,7 +237,7 @@ body{
     text-overflow:ellipsis;
     font-family:'Inter',system-ui,sans-serif;
     font-weight:500;
-    font-style:normal;
+    font-style: italic;
     letter-spacing:0.01em;
     border:none;
     border-radius:0;
@@ -286,6 +286,7 @@ body{
     white-space:pre-wrap;
     font-size:14px;
     font-family:'Inter',system-ui,sans-serif;
+    font-style: italic;
 }
 
 .msg.assistant{
@@ -319,6 +320,7 @@ body{
     font-family:'Inter',system-ui,sans-serif;
     font-weight:500;
     letter-spacing:0.04em;
+    font-style: italic;
 }
 
 @media (max-width:720px){
