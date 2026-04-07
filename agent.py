@@ -20,6 +20,8 @@ from db import (
     update_session_state,
 )
 
+# Ключевое слово для активации команд (можно менять)
+COMMAND_PREFIX = "Ким"
 
 class Agent:
     GROQ_LABELS = {
@@ -242,28 +244,30 @@ class Agent:
         raise ValueError("Модель вернула невалидный JSON")
 
     def _system_prompt(self) -> str:
-        return """
+        return f"""
 Ты — веб-терминал и ассистент с полным доступом к серверу.
+
+ВАЖНОЕ ПРАВИЛО:
+Ты выполняешь команды (shell, edit_css, edit_full) ТОЛЬКО если пользователь явно обратился к тебе по имени "{COMMAND_PREFIX}" (например, "{COMMAND_PREFIX}, поменяй фон" или "{COMMAND_PREFIX}, выполни ls").
+Если имя не упомянуто, ты отвечаешь только текстом (режим chat) и НЕ выполняешь никаких действий, НЕ меняешь HTML, НЕ выполняешь shell-команды.
 
 Режимы (возвращай ТОЛЬКО JSON):
 
 1) chat — обычный разговор, без действий.
-   { "mode": "chat", "assistant": "текст ответа" }
+   {{ "mode": "chat", "assistant": "текст ответа" }}
 
 2) shell — выполнить команду на сервере.
-   { "mode": "shell", "assistant": "пояснение", "command": "команда" }
-   Примеры: "ls -la", "cat /opt/my-agent/main.py", "systemctl restart my-agent", "journalctl -u my-agent -n 50"
+   {{ "mode": "shell", "assistant": "пояснение", "command": "команда" }}
+   Примеры: "ls -la", "cat /opt/my-agent/main.py", "systemctl restart my-agent"
 
-3) edit_css — изменить внешний вид текущей страницы (только CSS, без полного HTML).
-   { "mode": "edit_css", "assistant": "пояснение", "css": "body { background: black; }" }
+3) edit_css — изменить внешний вид текущей страницы (только CSS).
+   {{ "mode": "edit_css", "assistant": "пояснение", "css": "body {{ background: black; }}" }}
 
-4) edit_full (устаревший) — использовать только если edit_css невозможен. Верни полный HTML.
+4) edit_full — устаревший, использовать только если edit_css невозможен.
 
 Правила:
 - Никаких пояснений вне JSON.
-- Команды shell выполняются сразу, без подтверждения.
-- Для изменения фона, цветов, шрифтов используй edit_css.
-- Для сложных изменений (добавление блоков) можно использовать edit_full, но это дорого.
+- Если пользователь не произнёс "{COMMAND_PREFIX}", ты не имеешь права использовать режимы shell/edit_css/edit_full.
 - Отвечай по-русски.
 """.strip()
 
@@ -292,6 +296,7 @@ class Agent:
         else:
             raise RuntimeError(f"Неизвестный provider: {provider}")
         payload = {"model": model, "messages": messages}
+        # Здесь можно добавить параметры temperature и max_tokens, если они будут сохранены в конфиге
         resp = requests.post(url, headers=headers, json=payload, timeout=self.timeout)
         if not resp.ok:
             try:
@@ -308,7 +313,42 @@ class Agent:
         if not clean_message:
             return {"success": False, "error": "Пустое сообщение"}
 
-        lower = clean_message.lower()
+        # Проверяем, есть ли имя агента в начале сообщения или как обращение
+        lower_msg = clean_message.lower()
+        prefix_lower = COMMAND_PREFIX.lower()
+        has_command_keyword = (lower_msg.startswith(prefix_lower + " ") or 
+                               lower_msg.startswith(prefix_lower + ",") or
+                               f" {prefix_lower} " in lower_msg or
+                               lower_msg.endswith(f" {prefix_lower}"))
+
+        # Если ключевого слова нет — принудительно переводим в режим chat (простой разговор)
+        if not has_command_keyword:
+            # Сохраняем сообщение пользователя
+            session = self.ensure_session(session_name, provider=provider, model=model)
+            add_message(session["id"], "user", clean_message, None, None)
+            # Отвечаем простым текстом без вызова модели (экономит токены)
+            reply_text = f"Я тебя слышу, но я выполняю команды только если ты обратишься ко мне по имени: «{COMMAND_PREFIX}». Например: «{COMMAND_PREFIX}, поменяй фон на чёрный» или «{COMMAND_PREFIX}, выполни ls -la»."
+            add_message(session["id"], "assistant", reply_text, session["provider"], session["model"])
+            return {
+                "success": True,
+                "reply": reply_text,
+                "changed": False,
+                "provider": session["provider"],
+                "model": session["model"],
+                "label": self.label_for(session["provider"], session["model"]),
+            }
+
+        # Удаляем ключевое слово из сообщения, чтобы модель не путалась
+        # Удаляем "Ким" в начале, с запятой или пробелом
+        modified_message = re.sub(rf'^{COMMAND_PREFIX}[,\s]+', '', clean_message, flags=re.IGNORECASE)
+        modified_message = re.sub(rf'\s+{COMMAND_PREFIX}[,\s]*$', '', modified_message, flags=re.IGNORECASE)
+        modified_message = re.sub(rf'\s+{COMMAND_PREFIX}[,\s]+', ' ', modified_message, flags=re.IGNORECASE)
+        modified_message = modified_message.strip()
+        if not modified_message:
+            modified_message = "привет"  # если было только имя
+
+        # Далее идёт обычная логика с вызовом модели
+        lower = modified_message.lower()
         if lower in {"/undo", "undo", "откати назад", "откатить назад", "верни назад", "верни как было"}:
             return self.undo(session_name)
         if lower in {"/clear", "/clear-history", "очисти историю", "сотри историю"}:
@@ -318,8 +358,7 @@ class Agent:
         provider = session["provider"]
         model = session["model"]
 
-        # Сохраняем сообщение пользователя
-        add_message(session["id"], "user", clean_message, None, None)
+        add_message(session["id"], "user", modified_message, None, None)
 
         history = get_history(session["id"], limit=20)
         compact_history = []
@@ -342,7 +381,7 @@ class Agent:
                         "model": model,
                         "history": compact_history,
                         "current_html": current_html,
-                        "user_message": clean_message,
+                        "user_message": modified_message,
                     },
                     ensure_ascii=False,
                 ),
@@ -353,7 +392,6 @@ class Agent:
             raw_reply = self._call_provider(provider, model, messages)
             data = self._extract_json(raw_reply)
         except Exception as e:
-            # Если модель вернула мусор, отвечаем ошибкой, но сохраняем assistant сообщение
             error_text = f"Ошибка обработки ответа модели: {str(e)}"
             add_message(session["id"], "assistant", error_text, provider, model)
             return {
@@ -404,7 +442,6 @@ class Agent:
                 changed = True
                 assistant_text = assistant_text or "HTML обновлён."
 
-        # ВСЕГДА сохраняем ответ ассистента
         add_message(session["id"], "assistant", assistant_text, provider, model)
         return {
             "success": True,
@@ -432,7 +469,7 @@ class Agent:
 
 agent = Agent()
 
-# GLOBAL_MODEL_OVERRIDE
+# GLOBAL_MODEL_OVERRIDE (оставляем как было)
 import json as _gmo_json
 from pathlib import Path as _gmo_Path
 _GMO_FILE = _gmo_Path("/opt/my-agent/global_model.json")
@@ -455,7 +492,7 @@ if not getattr(Agent.chat, "__name__", "") == "_agent_chat_with_global_model":
         return _AGENT_CHAT_ORIG(self, session_name, message, provider=provider, model=model)
     Agent.chat = _agent_chat_with_global_model
 
-# CURATED_MODEL_OPTIONS (оставлен как был, без изменений)
+# CURATED_MODEL_OPTIONS (оставляем как есть, без изменений)
 def _cmo_dedupe(items):
     out = []
     seen = set()
