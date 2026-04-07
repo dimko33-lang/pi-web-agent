@@ -174,10 +174,6 @@ body{
     backdrop-filter:blur(4px);
 }
 
-#clearAllBtn{
-    min-width:54px;
-}
-
 #adminControls select:hover,
 #adminControls button:hover{
     background:rgba(255,255,255,0.12);
@@ -370,10 +366,6 @@ body{
         line-height:17px;
     }
 
-    #clearAllBtn{
-        min-width:48px;
-    }
-
     #modelDock{
         max-width:118px;
     }
@@ -426,8 +418,8 @@ body{
   <div id="adminControls">
     <select id="sessionSelect"></select>
     <button id="undoBtn" type="button">undo</button>
+    <button id="redoBtn" type="button">redo</button>
     <button id="clearBtn" type="button">clear</button>
-    <button id="clearAllBtn" type="button">clear ALL</button>
     <button id="refreshBtn" type="button">refresh</button>
   </div>
   <div id="modelDock">
@@ -451,8 +443,8 @@ const fsZone = document.getElementById('fullscreenZone');
 const adminControls = document.getElementById('adminControls');
 const sessionSelect = document.getElementById('sessionSelect');
 const undoBtn = document.getElementById('undoBtn');
+const redoBtn = document.getElementById('redoBtn');
 const clearBtn = document.getElementById('clearBtn');
-const clearAllBtn = document.getElementById('clearAllBtn');
 const refreshBtn = document.getElementById('refreshBtn');
 
 const modelCurrent = document.getElementById('modelCurrent');
@@ -469,16 +461,14 @@ let models = [];
 let poller = null;
 let isSending = false;
 
+let clearConfirmArmed = false;
+let clearConfirmTimer = null;
+
 function baseModelName(name) {
   let s = String(name || '').trim();
 
-  if (s.includes('·')) {
-    s = s.split('·').pop().trim();
-  }
-
-  if (s.includes('/')) {
-    s = s.split('/').pop().trim();
-  }
+  if (s.includes('·')) s = s.split('·').pop().trim();
+  if (s.includes('/')) s = s.split('/').pop().trim();
 
   s = s
     .replace(/^openrouter\s*[:·-]?\s*/i, '')
@@ -562,7 +552,6 @@ function compactModelName(name, maxLen = 18) {
   s = s
     .replace(/\bChat\b/ig, '')
     .replace(/\bSonnet\b/ig, '')
-    .replace(/\bFlash\b/ig, 'Flash')
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -609,6 +598,30 @@ function api(method, url, data=null, admin=false) {
 function autoResize() {
   input.style.height = 'auto';
   input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+}
+
+function armClearButton() {
+  clearConfirmArmed = true;
+  clearBtn.textContent = 'sure?';
+  clearBtn.style.background = 'rgba(255,120,120,0.16)';
+  clearBtn.style.borderColor = 'rgba(255,160,160,0.34)';
+
+  if (clearConfirmTimer) clearTimeout(clearConfirmTimer);
+  clearConfirmTimer = setTimeout(() => {
+    disarmClearButton();
+  }, 900);
+}
+
+function disarmClearButton() {
+  clearConfirmArmed = false;
+  clearBtn.textContent = 'clear';
+  clearBtn.style.background = '';
+  clearBtn.style.borderColor = '';
+
+  if (clearConfirmTimer) {
+    clearTimeout(clearConfirmTimer);
+    clearConfirmTimer = null;
+  }
 }
 
 function renderHistory(items) {
@@ -838,38 +851,54 @@ input.addEventListener('keydown', (e) => {
 sessionSelect.addEventListener('change', async () => {
   currentSession = sessionSelect.value;
   localStorage.setItem('pi_admin_target_session', currentSession);
+  disarmClearButton();
   await loadHistory();
 });
 
 undoBtn.onclick = async () => {
   try {
+    disarmClearButton();
     await api('POST', '/admin/undo', {session: currentSession}, true);
     await loadHistory();
     location.reload();
   } catch (e) {
     console.error(e);
+    showError(e.message || 'Undo failed');
+  }
+};
+
+redoBtn.onclick = async () => {
+  try {
+    disarmClearButton();
+    await api('POST', '/admin/redo', {session: currentSession}, true);
+    await loadHistory();
+    location.reload();
+  } catch (e) {
+    console.error(e);
+    showError(e.message || 'Redo failed');
   }
 };
 
 clearBtn.onclick = async () => {
   try {
+    if (!clearConfirmArmed) {
+      armClearButton();
+      return;
+    }
+
+    disarmClearButton();
     await api('POST', '/admin/clear_session', {session: currentSession}, true);
     await loadHistory();
   } catch (e) {
     console.error(e);
+    showError(e.message || 'Clear failed');
   }
 };
 
-clearAllBtn.onclick = async () => {
-  try {
-    await api('POST', '/admin/clear_all_histories', {}, true);
-    await loadHistory();
-  } catch (e) {
-    console.error(e);
-  }
+refreshBtn.onclick = () => {
+  disarmClearButton();
+  location.reload();
 };
-
-refreshBtn.onclick = () => location.reload();
 
 modelCurrent.onclick = (e) => {
   e.stopPropagation();
