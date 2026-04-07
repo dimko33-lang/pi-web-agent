@@ -16,8 +16,8 @@ from db import (
     read_session_html,
     save_session_html,
     undo_last_snapshot,
+    redo_last_snapshot,
     update_session_state,
-    restore_from_redo,
 )
 
 
@@ -173,7 +173,7 @@ class Agent:
 
     def redo(self, session_name: str):
         session = get_or_create_session(session_name)
-        ok = restore_from_redo(session["id"])
+        ok = redo_last_snapshot(session["id"])
         return {
             "success": True,
             "reply": "Вернул изменение вперёд." if ok else "Возвращать нечего.",
@@ -439,7 +439,7 @@ if not getattr(Agent.chat, "__name__", "") == "_agent_chat_with_global_model":
         return _AGENT_CHAT_ORIG(self, session_name, message, provider=provider, model=model)
     Agent.chat = _agent_chat_with_global_model
 
-# CURATED_MODEL_OPTIONS (сохраняем твой старый вариант, он уже есть в файле, но для полноты приведу кратко)
+# CURATED_MODEL_OPTIONS
 def _cmo_dedupe(items):
     out = []
     seen = set()
