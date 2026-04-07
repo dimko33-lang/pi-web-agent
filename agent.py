@@ -17,6 +17,7 @@ from db import (
     save_session_html,
     undo_last_snapshot,
     update_session_state,
+    restore_from_redo,
 )
 
 
@@ -164,6 +165,18 @@ class Agent:
         return {
             "success": True,
             "reply": "Откатил последнее изменение." if ok else "Откатывать нечего.",
+            "changed": bool(ok),
+            "provider": session["provider"],
+            "model": session["model"],
+            "label": self.label_for(session["provider"], session["model"]),
+        }
+
+    def redo(self, session_name: str):
+        session = get_or_create_session(session_name)
+        ok = restore_from_redo(session["id"])
+        return {
+            "success": True,
+            "reply": "Вернул изменение вперёд." if ok else "Возвращать нечего.",
             "changed": bool(ok),
             "provider": session["provider"],
             "model": session["model"],
@@ -426,7 +439,7 @@ if not getattr(Agent.chat, "__name__", "") == "_agent_chat_with_global_model":
         return _AGENT_CHAT_ORIG(self, session_name, message, provider=provider, model=model)
     Agent.chat = _agent_chat_with_global_model
 
-# BEGIN CURATED_MODEL_OPTIONS
+# CURATED_MODEL_OPTIONS (сохраняем твой старый вариант, он уже есть в файле, но для полноты приведу кратко)
 def _cmo_dedupe(items):
     out = []
     seen = set()
@@ -447,7 +460,6 @@ def _cmo_or_label(item):
 
 def _cmo_model_options(self):
     items = []
-
     # ----- GROQ -----
     groq_order = [
         "qwen-qwq-32b",
@@ -573,4 +585,3 @@ def _cmo_model_options(self):
     return _cmo_dedupe(items)
 
 Agent.model_options = _cmo_model_options
-# END CURATED_MODEL_OPTIONS
