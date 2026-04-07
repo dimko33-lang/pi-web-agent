@@ -1,6 +1,8 @@
 import json
 import os
 import re
+import subprocess
+import shlex
 from typing import List, Dict
 
 import requests
@@ -64,7 +66,7 @@ class Agent:
         self.default_openrouter_model = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o").strip()
         self.default_kimi_model = os.getenv("KIMI_MODEL", "kimi-k2.5").strip()
 
-        self.timeout = 90  # уменьшено с 180
+        self.timeout = 90
 
     def default_model_for(self, provider: str) -> str:
         if provider == "openrouter":
@@ -79,37 +81,28 @@ class Agent:
 
         if provider == "groq":
             return self.GROQ_LABELS.get(model, model)
-
         if provider == "openrouter":
             for name, mid in self.OPENROUTER_FAVORITES:
                 if mid == model:
                     return name
             return model
-
         if provider == "kimi":
             for name, mid in self.KIMI_MODELS:
                 if mid == model:
                     return name
             return model
-
         return model or "Unknown"
 
     def model_options(self) -> List[Dict]:
         models = []
-
         if self.groq_key:
             models.extend(self._groq_models())
-
         if self.openrouter_key:
             models.extend(self._openrouter_models())
-
         if self.kimi_key:
             models.extend(self._kimi_models())
-
         if not models:
-            models = [
-                {"name": "Llama 3.1 8B", "provider": "groq", "model": "llama-3.1-8b-instant"},
-            ]
+            models = [{"name": "Llama 3.1 8B", "provider": "groq", "model": "llama-3.1-8b-instant"}]
         return models
 
     def _groq_models(self):
@@ -117,10 +110,7 @@ class Agent:
         try:
             r = requests.get(
                 "https://api.groq.com/openai/v1/models",
-                headers={
-                    "Authorization": f"Bearer {self.groq_key}",
-                    "Content-Type": "application/json",
-                },
+                headers={"Authorization": f"Bearer {self.groq_key}", "Content-Type": "application/json"},
                 timeout=20,
             )
             r.raise_for_status()
@@ -128,58 +118,34 @@ class Agent:
             ids = sorted({item["id"] for item in data.get("data", []) if item.get("id")})
         except Exception:
             ids = list(self.GROQ_LABELS.keys())
-
         for model_id in ids:
-            out.append({
-                "name": self.GROQ_LABELS.get(model_id, model_id),
-                "provider": "groq",
-                "model": model_id,
-            })
+            out.append({"name": self.GROQ_LABELS.get(model_id, model_id), "provider": "groq", "model": model_id})
         return out
 
     def _openrouter_models(self):
         out = []
         available = set()
-
         try:
-            r = requests.get(
-                "https://openrouter.ai/api/v1/models",
-                timeout=20,
-            )
+            r = requests.get("https://openrouter.ai/api/v1/models", timeout=20)
             r.raise_for_status()
             data = r.json()
             available = {item["id"] for item in data.get("data", []) if item.get("id")}
         except Exception:
             available = {mid for _, mid in self.OPENROUTER_FAVORITES}
-
         for name, model_id in self.OPENROUTER_FAVORITES:
             if model_id in available:
-                out.append({
-                    "name": name,
-                    "provider": "openrouter",
-                    "model": model_id,
-                })
-
+                out.append({"name": name, "provider": "openrouter", "model": model_id})
         if not out:
             for name, model_id in self.OPENROUTER_FAVORITES:
-                out.append({
-                    "name": name,
-                    "provider": "openrouter",
-                    "model": model_id,
-                })
-
+                out.append({"name": name, "provider": "openrouter", "model": model_id})
         return out
 
     def _kimi_models(self):
-        return [
-            {"name": name, "provider": "kimi", "model": model_id}
-            for name, model_id in self.KIMI_MODELS
-        ]
+        return [{"name": name, "provider": "kimi", "model": model_id} for name, model_id in self.KIMI_MODELS]
 
     def ensure_session(self, session_name: str, provider=None, model=None):
         provider = (provider or self.default_provider).strip().lower()
         model = (model or self.default_model_for(provider)).strip()
-
         session = get_or_create_session(session_name, provider=provider, model=model)
         session = update_session_state(session["id"], provider, model)
         return session
@@ -216,134 +182,85 @@ class Agent:
             "label": self.label_for(session["provider"], session["model"]),
         }
 
+    def _execute_command(self, command: str) -> dict:
+        try:
+            result = subprocess.run(
+                shlex.split(command),
+                capture_output=True,
+                text=True,
+                timeout=30,
+                cwd="/opt/my-agent"
+            )
+            output = result.stdout + result.stderr
+            if not output:
+                output = "(no output)"
+            return {"output": output, "exit_code": result.returncode}
+        except subprocess.TimeoutExpired:
+            return {"output": "Command timed out after 30 seconds", "exit_code": -1}
+        except Exception as e:
+            return {"output": str(e), "exit_code": -1}
+
+    def _apply_css_to_html(self, html: str, css: str) -> str:
+        style_tag = f'<style id="agent-style">\n{css}\n</style>'
+        if '<style id="agent-style">' in html:
+            new_html = re.sub(r'<style id="agent-style">.*?</style>', style_tag, html, flags=re.DOTALL)
+        else:
+            if '</head>' in html:
+                new_html = html.replace('</head>', f'{style_tag}\n</head>')
+            else:
+                new_html = html + style_tag
+        return new_html
+
     def _extract_json(self, text: str) -> dict:
         raw = (text or "").strip()
         if not raw:
             raise ValueError("Модель вернула пустой ответ")
-
         try:
             return json.loads(raw)
         except Exception:
             pass
-
         fenced = re.search(r"```(?:json)?\s*(\{.*\})\s*```", raw, re.S | re.I)
         if fenced:
             return json.loads(fenced.group(1).strip())
-
         start = raw.find("{")
         end = raw.rfind("}")
         if start != -1 and end != -1 and end > start:
-            return json.loads(raw[start:end + 1])
-
+            return json.loads(raw[start:end+1])
         raise ValueError("Модель вернула невалидный JSON")
-
-    def _extract_html(self, text: str) -> str:
-        raw = (text or "").strip()
-        if not raw:
-            raise ValueError("Пустой HTML")
-
-        fenced = re.search(r"```(?:html)?\s*(.*?)```", raw, re.S | re.I)
-        if fenced:
-            raw = fenced.group(1).strip()
-
-        doc = re.search(r"(?is)(<!doctype html>.*?</html>|<html\b.*?</html>)", raw)
-        html = doc.group(1).strip() if doc else raw.strip()
-        lower = html.lower()
-
-        if "<html" not in lower and "<!doctype" not in lower:
-            raise ValueError("Ответ не похож на полный HTML")
-
-        # обязательные элементы интерфейса, которые нельзя ломать
-        required_markers = [
-            "chatMessages",
-            "messageInput",
-            "sendLabel",
-            "pathDisplay",
-            "adminControls",
-            "sessionSelect",
-            "undoBtn",
-            "clearBtn",
-            "clearAllBtn",
-            "refreshBtn",
-            "modelCurrent",
-            "modelDropdown",
-            "fullscreenZone",
-            "sendMessage(",
-            "loadHistory(",
-            "syncGlobalModel(",
-            "/chat",
-            "/history",
-            "/global_model",
-        ]
-
-        missing = [m for m in required_markers if m not in html]
-        if missing:
-            raise ValueError(
-                "Модель сломала терминальную оболочку. "
-                "Попробуй более простую правку без переписывания логики интерфейса."
-            )
-
-        return html
 
     def _system_prompt(self) -> str:
         return """
-Ты — агент веб-терминала.
+Ты — веб-терминал и ассистент с полным доступом к серверу.
 
-У тебя два режима:
+Режимы (возвращай ТОЛЬКО JSON):
 
-1) chat
-Если пользователь просто разговаривает, задаёт вопрос, шутит, просит мнение
-или не просит менять страницу — ответь текстом и НЕ меняй HTML.
+1) chat — обычный разговор, без действий.
+   { "mode": "chat", "assistant": "текст ответа" }
 
-2) edit
-Если пользователь просит изменить внешний вид, текст, блоки, секции, карточки,
-отступы, заголовки или layout — измени текущий HTML и верни ПОЛНЫЙ новый HTML целиком.
+2) shell — выполнить команду на сервере.
+   { "mode": "shell", "assistant": "пояснение", "command": "команда" }
+   Примеры: "ls -la", "cat /opt/my-agent/main.py", "systemctl restart my-agent", "journalctl -u my-agent -n 50"
 
-Возвращай СТРОГО JSON и ничего кроме JSON:
+3) edit_css — изменить внешний вид текущей страницы (только CSS, без полного HTML).
+   { "mode": "edit_css", "assistant": "пояснение", "css": "body { background: black; }" }
 
-{
-  "mode": "chat" или "edit",
-  "assistant": "короткий ответ пользователю",
-  "html": "полный HTML целиком или пустая строка"
-}
+4) edit_full (устаревший) — использовать только если edit_css невозможен. Верни полный HTML.
 
-ПРАВИЛА:
-- никаких пояснений вне JSON;
-- если mode = chat, поле html должно быть пустой строкой;
-- если mode = edit, поле html должно содержать полный HTML;
-- отвечай по-русски;
-- стиль по умолчанию минималистичный;
-- если пользователь не просил другое, сохраняй спокойную PI-like эстетику;
-- если пользователь не просил другое, базовый фон держи в духе rgb(20, 40, 76).
-
-ВАЖНО ДЛЯ edit:
-- это рабочий интерфейс агента, не ломай его;
-- обязательно сохраняй существующую JS-логику;
-- не удаляй и не переименовывай fetch-запросы и системные функции;
-- обязательно сохраняй элементы/идентификаторы:
-  chatMessages, messageInput, sendLabel, pathDisplay, adminControls,
-  sessionSelect, undoBtn, clearBtn, clearAllBtn, refreshBtn,
-  modelCurrent, modelDropdown, fullscreenZone;
-- обязательно сохраняй функции:
-  sendMessage, loadHistory, syncGlobalModel, loadAdmin, loadPublic;
-- если задачу можно решить стилями, текстом или перестановкой блоков —
-  НЕ переписывай скрипты;
-- возвращай полный HTML-документ, начинающийся с <!doctype html>
-  и заканчивающийся </html>.
+Правила:
+- Никаких пояснений вне JSON.
+- Команды shell выполняются сразу, без подтверждения.
+- Для изменения фона, цветов, шрифтов используй edit_css.
+- Для сложных изменений (добавление блоков) можно использовать edit_full, но это дорого.
+- Отвечай по-русски.
 """.strip()
 
     def _call_provider(self, provider: str, model: str, messages: list) -> str:
         provider = (provider or "").strip().lower()
-
         if provider == "groq":
             if not self.groq_key:
                 raise RuntimeError("GROQ_API_KEY не задан")
             url = "https://api.groq.com/openai/v1/chat/completions"
-            headers = {
-                "Authorization": f"Bearer {self.groq_key}",
-                "Content-Type": "application/json",
-            }
-
+            headers = {"Authorization": f"Bearer {self.groq_key}", "Content-Type": "application/json"}
         elif provider == "openrouter":
             if not self.openrouter_key:
                 raise RuntimeError("OPENROUTER_API_KEY не задан")
@@ -354,48 +271,33 @@ class Agent:
                 "HTTP-Referer": os.getenv("PI_PUBLIC_URL", "http://localhost"),
                 "X-Title": "Pi Browser Agent",
             }
-
         elif provider == "kimi":
             if not self.kimi_key:
                 raise RuntimeError("KIMI_API_KEY не задан")
             url = "https://api.moonshot.ai/v1/chat/completions"
-            headers = {
-                "Authorization": f"Bearer {self.kimi_key}",
-                "Content-Type": "application/json",
-            }
-
+            headers = {"Authorization": f"Bearer {self.kimi_key}", "Content-Type": "application/json"}
         else:
             raise RuntimeError(f"Неизвестный provider: {provider}")
-
-        payload = {
-            "model": model,
-            "messages": messages,
-        }
-
+        payload = {"model": model, "messages": messages}
         resp = requests.post(url, headers=headers, json=payload, timeout=self.timeout)
-
         if not resp.ok:
             try:
                 err = resp.json()
                 raise RuntimeError(f"{provider} error {resp.status_code}: {json.dumps(err, ensure_ascii=False)}")
             except Exception:
                 raise RuntimeError(f"{provider} error {resp.status_code}: {resp.text[:800]}")
-
         data = resp.json()
         return data["choices"][0]["message"]["content"] or ""
 
     def chat(self, session_name: str, message: str, provider=None, model=None):
         session_name = (session_name or "default").strip() or "default"
         clean_message = (message or "").strip()
-
         if not clean_message:
             return {"success": False, "error": "Пустое сообщение"}
 
         lower = clean_message.lower()
-
         if lower in {"/undo", "undo", "откати назад", "откатить назад", "верни назад", "верни как было"}:
             return self.undo(session_name)
-
         if lower in {"/clear", "/clear-history", "очисти историю", "сотри историю"}:
             return self.clear(session_name)
 
@@ -438,16 +340,43 @@ class Agent:
 
         mode = str(data.get("mode") or "chat").strip().lower()
         assistant_text = str(data.get("assistant") or "").strip() or "Готово."
-        html = str(data.get("html") or "").strip()
-
         changed = False
-        if mode == "edit":
-            new_html = self._extract_html(html)
-            save_session_html(session["id"], new_html)
-            changed = True
+
+        if mode == "shell":
+            command = data.get("command", "").strip()
+            if command:
+                exec_result = self._execute_command(command)
+                full_output = f"$ {command}\n{exec_result['output']}"
+                assistant_text = full_output
+                add_message(session["id"], "assistant", assistant_text, provider, model)
+                return {
+                    "success": True,
+                    "reply": assistant_text,
+                    "changed": False,
+                    "provider": provider,
+                    "model": model,
+                    "label": self.label_for(provider, model),
+                }
+
+        elif mode == "edit_css":
+            css = data.get("css", "").strip()
+            if css:
+                new_html = self._apply_css_to_html(current_html, css)
+                save_session_html(session["id"], new_html)
+                changed = True
+                assistant_text = "CSS обновлён."
+            else:
+                assistant_text = "Не удалось применить CSS (пустая строка)."
+
+        elif mode == "edit_full":
+            html = str(data.get("html") or "").strip()
+            if html:
+                new_html = self._extract_html(html)
+                save_session_html(session["id"], new_html)
+                changed = True
+                assistant_text = assistant_text or "HTML обновлён."
 
         add_message(session["id"], "assistant", assistant_text, provider, model)
-
         return {
             "success": True,
             "reply": assistant_text,
@@ -457,15 +386,27 @@ class Agent:
             "label": self.label_for(provider, model),
         }
 
+    def _extract_html(self, text: str) -> str:
+        raw = (text or "").strip()
+        if not raw:
+            raise ValueError("Пустой HTML")
+        fenced = re.search(r"```(?:html)?\s*(.*?)```", raw, re.S | re.I)
+        if fenced:
+            raw = fenced.group(1).strip()
+        doc = re.search(r"(?is)(<!doctype html>.*?</html>|<html\b.*?</html>)", raw)
+        html = doc.group(1).strip() if doc else raw.strip()
+        lower = html.lower()
+        if "<html" not in lower and "<!doctype" not in lower:
+            raise ValueError("Ответ не похож на полный HTML")
+        return html
+
 
 agent = Agent()
 
-# BEGIN GLOBAL_MODEL_OVERRIDE
+# GLOBAL_MODEL_OVERRIDE
 import json as _gmo_json
 from pathlib import Path as _gmo_Path
-
 _GMO_FILE = _gmo_Path("/opt/my-agent/global_model.json")
-
 def _gmo_load():
     try:
         data = _gmo_json.loads(_GMO_FILE.read_text(encoding="utf-8"))
@@ -476,18 +417,14 @@ def _gmo_load():
     except Exception:
         pass
     return None, None
-
 if not getattr(Agent.chat, "__name__", "") == "_agent_chat_with_global_model":
     _AGENT_CHAT_ORIG = Agent.chat
-
     def _agent_chat_with_global_model(self, session_name: str, message: str, provider=None, model=None):
         gp, gm = _gmo_load()
         if gp and gm:
             provider, model = gp, gm
         return _AGENT_CHAT_ORIG(self, session_name, message, provider=provider, model=model)
-
     Agent.chat = _agent_chat_with_global_model
-# END GLOBAL_MODEL_OVERRIDE
 
 # BEGIN CURATED_MODEL_OPTIONS
 def _cmo_dedupe(items):
@@ -552,10 +489,7 @@ def _cmo_model_options(self):
         try:
             r = requests.get(
                 "https://api.groq.com/openai/v1/models",
-                headers={
-                    "Authorization": f"Bearer {self.groq_key}",
-                    "Content-Type": "application/json",
-                },
+                headers={"Authorization": f"Bearer {self.groq_key}", "Content-Type": "application/json"},
                 timeout=20,
             )
             r.raise_for_status()
