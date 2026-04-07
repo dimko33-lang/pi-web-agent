@@ -188,9 +188,16 @@ body{
     margin-left:0;
     position:relative;
     flex:0 0 auto;
+    min-width:0;
+    max-width:150px;
 }
 
 #modelCurrent{
+    display:block;
+    max-width:150px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
     font-family:'Inter',system-ui,sans-serif;
     font-size:11px;
     font-weight:500;
@@ -367,6 +374,15 @@ body{
         min-width:48px;
     }
 
+    #modelDock{
+        max-width:118px;
+    }
+
+    #modelCurrent{
+        max-width:118px;
+        font-size:10px;
+    }
+
     #modelDropdown{
         max-width:92vw;
     }
@@ -453,27 +469,121 @@ let models = [];
 let poller = null;
 let isSending = false;
 
-function cleanModelName(name) {
-  return String(name || '')
+function baseModelName(name) {
+  let s = String(name || '').trim();
+
+  if (s.includes('·')) {
+    s = s.split('·').pop().trim();
+  }
+
+  if (s.includes('/')) {
+    s = s.split('/').pop().trim();
+  }
+
+  s = s
     .replace(/^openrouter\s*[:·-]?\s*/i, '')
     .replace(/^open router\s*[:·-]?\s*/i, '')
+    .replace(/^groq\s*[:·-]?\s*/i, '')
+    .replace(/^meta[- ]llama\s*[:·-]?\s*/i, '')
+    .replace(/^meta\s*[:·-]?\s*/i, '')
+    .replace(/^openai\s*[:·-]?\s*/i, '')
+    .replace(/^google\s*[:·-]?\s*/i, '')
+    .replace(/^anthropic\s*[:·-]?\s*/i, '')
+    .replace(/^moonshotai\s*[:·-]?\s*/i, '')
+    .replace(/^moonshot\s*[:·-]?\s*/i, '')
     .trim();
+
+  return s;
 }
 
-function shortenLabel(provider, name) {
-  const raw = String(provider || '').trim();
-  const lower = raw.toLowerCase();
-  const modelName = String(name || '').trim();
+function humanModelName(name) {
+  let s = baseModelName(name);
 
-  if (lower === 'openrouter') {
-    return `OR: ${cleanModelName(modelName)}`;
+  const directMap = [
+    [/^llama[- ]?3\.1[- ]?8b[- ]?instant$/i, 'llama 3.1 8B'],
+    [/^llama[- ]?3\.1[- ]?70b[- ]?versatile$/i, 'llama 3.1 70B'],
+    [/^llama[- ]?3\.3[- ]?70b[- ]?versatile$/i, 'llama 3.3 70B'],
+    [/^gpt[- ]?4o[- ]?mini$/i, 'GPT-4o mini'],
+    [/^gpt[- ]?4\.?1[- ]?mini$/i, 'GPT-4.1 mini'],
+    [/^gpt[- ]?4\.?1$/i, 'GPT-4.1'],
+    [/^kimi[- ]?k2$/i, 'Kimi K2'],
+    [/^gemini[- ]?2\.0[- ]?flash(?:[- ]?exp)?$/i, 'Gemini 2.0 Flash'],
+    [/^deepseek[- ]?chat(?:[- ]?v?\d+(?:[- ]?\d+)*)?$/i, 'DeepSeek Chat'],
+    [/^deepseek[- ]?r1(?:[- ]?distill)?$/i, 'DeepSeek R1'],
+    [/^claude[- ]?3\.7[- ]?sonnet$/i, 'Claude 3.7 Sonnet'],
+    [/^claude[- ]?3\.5[- ]?sonnet$/i, 'Claude 3.5 Sonnet'],
+    [/^qwen[- ]?2\.5[- ]?72b(?:[- ]?instruct)?$/i, 'Qwen 2.5 72B'],
+    [/^qwen[- ]?2\.5[- ]?32b(?:[- ]?instruct)?$/i, 'Qwen 2.5 32B'],
+    [/^qwen[- ]?2\.5[- ]?14b(?:[- ]?instruct)?$/i, 'Qwen 2.5 14B'],
+    [/^mistral[- ]?small(?:[- ]?\d+(?:\.\d+)?)?$/i, 'Mistral Small']
+  ];
+
+  for (const [rx, out] of directMap) {
+    if (rx.test(s)) return out;
   }
 
-  if (lower === 'groq') {
-    return `GROQ: ${modelName}`;
-  }
+  s = s
+    .replace(/[_]+/g, '-')
+    .replace(/\binstant\b/ig, '')
+    .replace(/\binstruct\b/ig, '')
+    .replace(/\bversatile\b/ig, '')
+    .replace(/\bpreview\b/ig, '')
+    .replace(/\blatest\b/ig, '')
+    .replace(/\bonline\b/ig, '')
+    .replace(/\bfree\b/ig, '')
+    .replace(/\s+/g, ' ')
+    .replace(/-+/g, ' ')
+    .trim();
 
-  return `${raw}: ${modelName}`;
+  if (!s) return 'model';
+
+  const tokens = s.split(' ').map(t => {
+    const low = t.toLowerCase();
+    if (low === 'gpt') return 'GPT';
+    if (low === 'claude') return 'Claude';
+    if (low === 'gemini') return 'Gemini';
+    if (low === 'kimi') return 'Kimi';
+    if (low === 'qwen') return 'Qwen';
+    if (low === 'deepseek') return 'DeepSeek';
+    if (low === 'mistral') return 'Mistral';
+    if (low === 'grok') return 'Grok';
+    if (low === 'llama') return 'llama';
+    return t;
+  });
+
+  return tokens.join(' ');
+}
+
+function compactModelName(name, maxLen = 18) {
+  let s = humanModelName(name);
+
+  if (s.length <= maxLen) return s;
+
+  s = s
+    .replace(/\bChat\b/ig, '')
+    .replace(/\bSonnet\b/ig, '')
+    .replace(/\bFlash\b/ig, 'Flash')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (s.length <= maxLen) return s;
+
+  return s.slice(0, maxLen - 1).trimEnd() + '…';
+}
+
+function providerShort(provider) {
+  const p = String(provider || '').trim().toLowerCase();
+  if (p === 'openrouter') return 'OR';
+  if (p === 'groq') return 'GROQ';
+  return String(provider || '').trim();
+}
+
+function currentModelLabel(provider, name) {
+  return compactModelName(name, 18);
+}
+
+function dropdownModelLabel(provider, name) {
+  return `${providerShort(provider)}: ${humanModelName(name)}`;
 }
 
 function setThinking(v) {
@@ -535,10 +645,9 @@ function renderHistory(items) {
 }
 
 function renderModelDock() {
-  modelCurrent.textContent = shortenLabel(
-    currentModel.provider,
-    currentModel.model || currentModel.label || ''
-  );
+  const rawName = currentModel.model || currentModel.label || '';
+  modelCurrent.textContent = currentModelLabel(currentModel.provider, rawName);
+  modelCurrent.title = humanModelName(rawName);
   modelDropdown.innerHTML = '';
 
   if (!adminMode) {
@@ -563,7 +672,9 @@ function renderModelDock() {
     const isActive = m.provider === currentModel.provider && m.model === currentModel.model;
     const el = document.createElement('div');
     el.className = 'model-option' + (isActive ? ' active' : '');
-    el.textContent = shortenLabel(m.provider, m.model || m.name || '');
+    el.textContent = dropdownModelLabel(m.provider, m.model || m.name || '');
+    el.title = m.model || m.name || '';
+
     el.onclick = async (e) => {
       e.stopPropagation();
       try {
@@ -575,7 +686,7 @@ function renderModelDock() {
         currentModel = {
           provider: data.provider,
           model: data.model,
-          label: data.label || shortenLabel(data.provider, data.model)
+          label: data.label || dropdownModelLabel(data.provider, data.model)
         };
         renderModelDock();
         modelDropdown.style.display = 'none';
@@ -583,6 +694,7 @@ function renderModelDock() {
         console.error(e2);
       }
     };
+
     modelDropdown.appendChild(el);
   }
 }
