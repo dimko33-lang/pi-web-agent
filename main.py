@@ -29,7 +29,6 @@ LOCAL_IPS = {"127.0.0.1", "::1"}
 
 PUBLIC_SESSIONS = {"default", "slot1", "slot2", "slot3", "slot4", "slot5"}
 
-# === Глобальная модель для public сессий ===
 def _pgm_load():
     try:
         with open(APP_DIR / "global_model.json", "r", encoding="utf-8") as f:
@@ -347,7 +346,49 @@ def events():
         },
     )
 
-# BEGIN SAFE_ADMIN_API
+# ========== SHELL EXECUTION (без подтверждений) ==========
+import subprocess
+import shlex
+
+@app.post("/exec")
+def exec_command():
+    ctx = resolve_context()
+    if not ctx.get("ok") or not ctx.get("admin"):
+        return jsonify({"success": False, "error": "forbidden"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    command = str(payload.get("command") or "").strip()
+    if not command:
+        return jsonify({"success": False, "error": "empty command"}), 400
+
+    try:
+        result = subprocess.run(
+            shlex.split(command),
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd="/opt/my-agent"
+        )
+        output = result.stdout + result.stderr
+        if not output:
+            output = "(no output)"
+        # Сохраняем в историю
+        from db import add_message
+        session = get_session(ctx["target_session"])
+        if session:
+            add_message(session["id"], "assistant", f"$ {command}\n{output}", "shell", "exec")
+        return jsonify({
+            "success": True,
+            "command": command,
+            "exit_code": result.returncode,
+            "output": output
+        })
+    except subprocess.TimeoutExpired:
+        return jsonify({"success": False, "error": "Command timed out after 30 seconds"}), 408
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# ========== ADMIN API (безопасный) ==========
 import json as _admin_json
 import sqlite3 as _admin_sqlite3
 from pathlib import Path as _admin_Path
@@ -510,9 +551,7 @@ def admin_clear_all_histories():
 
     _admin_db_exec("DELETE FROM messages")
     return jsonify({"success": True, "cleared": "all_histories"})
-# END SAFE_ADMIN_API
 
-# BEGIN PUBLIC_GLOBAL_MODEL_ENDPOINT
 @app.get("/global_model")
 def global_model():
     provider, model = _pgm_load()
@@ -522,7 +561,6 @@ def global_model():
         "model": model,
         "label": agent.label_for(provider, model),
     })
-# END PUBLIC_GLOBAL_MODEL_ENDPOINT
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=8000, debug=True)
