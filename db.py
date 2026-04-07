@@ -98,28 +98,17 @@ def read_session_html(session_id: int) -> str:
     path = session_html_path(session_id)
     if path.exists():
         return path.read_text(encoding="utf-8")
-    # fallback: copy default if missing (should not happen normally)
     default = APP_DIR / "default_terminal.html"
     if default.exists():
         return default.read_text(encoding="utf-8")
     return "<!doctype html><html><body>Error: no template</body></html>"
 
-def save_session_html(session_id: int, new_html: str):
-    # 1. Save current HTML to snapshots (undo stack)
-    current_html = read_session_html(session_id)
-    if current_html != new_html:
-        with sqlite3.connect(DB_PATH) as conn:
-            conn.execute(
-                "INSERT INTO snapshots (session_id, html, created_at) VALUES (?, ?, ?)",
-                (session_id, current_html, int(time.time()))
-            )
-        # 2. Clear redo stack because new edit invalidates redo
-        clear_redo_snapshots(session_id)
-    # 3. Write new HTML
-    path = session_html_path(session_id)
-    path.write_text(new_html, encoding="utf-8")
-
-# ========== UNDO / REDO ==========
+def take_snapshot(session_id: int, html: str):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "INSERT INTO snapshots (session_id, html, created_at) VALUES (?, ?, ?)",
+            (session_id, html, int(time.time()))
+        )
 
 def push_redo_snapshot(session_id: int, html: str):
     with sqlite3.connect(DB_PATH) as conn:
@@ -134,7 +123,6 @@ def clear_redo_snapshots(session_id: int):
 
 def undo_last_snapshot(session_id: int) -> bool:
     with sqlite3.connect(DB_PATH) as conn:
-        # Get latest snapshot
         cur = conn.execute(
             "SELECT id, html FROM snapshots WHERE session_id = ? ORDER BY created_at DESC LIMIT 1",
             (session_id,)
@@ -142,60 +130,18 @@ def undo_last_snapshot(session_id: int) -> bool:
         row = cur.fetchone()
         if not row:
             return False
-        snapshot_id, old_html = row
-        # Save current HTML to redo stack before undoing
-        current_html = read_session_html(session_id)
-        push_redo_snapshot(session_id, current_html)
-        # Restore old HTML
-        save_session_html(session_id, old_html)   # this will also clear redo? careful: save_session_html clears redo after inserting snapshot.
-        # But we want to keep redo we just pushed. So we need to avoid clearing redo in this specific call.
-        # Workaround: remove the automatic clear_redo_snapshots in save_session_html for undo operation.
-        # Better to restructure: move snapshot saving and redo clearing out of save_session_html.
-        # However, to keep changes minimal, we'll override: after save_session_html, redo was cleared, so we must re-push.
-        # Simpler: rewrite save_session_html to not clear redo, and handle clearing elsewhere.
-        # But to avoid breaking existing code, I'll adjust: in undo, we call a special function that doesn't clear redo.
-        # Let's create a separate function: restore_session_html(session_id, html, keep_redo=False)
-    # We'll implement a helper instead of using save_session_html for undo/redo.
-    # I'll rewrite undo/redo using direct file write + manual snapshot management.
-    # See updated functions below.
-
-# Given complexity, I'll reimplement undo/redo properly with direct file writes and manual snapshot handling.
-# The save_session_html will only be used for normal edits (which should clear redo).
-
-def take_snapshot(session_id: int, html: str):
-    """Insert a snapshot without affecting redo."""
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute(
-            "INSERT INTO snapshots (session_id, html, created_at) VALUES (?, ?, ?)",
-            (session_id, html, int(time.time()))
-        )
-
-def restore_from_snapshot(session_id: int) -> bool:
-    """Undo: restore last snapshot, save current to redo, delete snapshot."""
-    with sqlite3.connect(DB_PATH) as conn:
-        cur = conn.execute(
-            "SELECT id, html FROM snapshots WHERE session_id = ? ORDER BY created_at DESC LIMIT 1",
-            (session_id,)
-        )
-        row = cur.fetchone()
-        if not row:
-            return False
-        snapshot_id, old_html = row
-        # Save current HTML to redo
+        snap_id, old_html = row
         current_html = read_session_html(session_id)
         conn.execute(
             "INSERT INTO redo_snapshots (session_id, html, created_at) VALUES (?, ?, ?)",
             (session_id, current_html, int(time.time()))
         )
-        # Write old HTML
         path = session_html_path(session_id)
         path.write_text(old_html, encoding="utf-8")
-        # Delete used snapshot
-        conn.execute("DELETE FROM snapshots WHERE id = ?", (snapshot_id,))
+        conn.execute("DELETE FROM snapshots WHERE id = ?", (snap_id,))
         return True
 
-def restore_from_redo(session_id: int) -> bool:
-    """Redo: restore last redo, save current to snapshots, delete redo."""
+def redo_last_snapshot(session_id: int) -> bool:
     with sqlite3.connect(DB_PATH) as conn:
         cur = conn.execute(
             "SELECT id, html FROM redo_snapshots WHERE session_id = ? ORDER BY created_at DESC LIMIT 1",
@@ -205,22 +151,24 @@ def restore_from_redo(session_id: int) -> bool:
         if not row:
             return False
         redo_id, redo_html = row
-        # Save current HTML to snapshots
         current_html = read_session_html(session_id)
         conn.execute(
             "INSERT INTO snapshots (session_id, html, created_at) VALUES (?, ?, ?)",
             (session_id, current_html, int(time.time()))
         )
-        # Write redo HTML
         path = session_html_path(session_id)
         path.write_text(redo_html, encoding="utf-8")
-        # Delete used redo
         conn.execute("DELETE FROM redo_snapshots WHERE id = ?", (redo_id,))
         return True
 
-def clear_redo_snapshots(session_id: int):
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute("DELETE FROM redo_snapshots WHERE session_id = ?", (session_id,))
+def save_session_html(session_id: int, new_html: str):
+    current_html = read_session_html(session_id)
+    if current_html == new_html:
+        return
+    take_snapshot(session_id, current_html)
+    clear_redo_snapshots(session_id)
+    path = session_html_path(session_id)
+    path.write_text(new_html, encoding="utf-8")
 
 def clear_history(session_id: int):
     with sqlite3.connect(DB_PATH) as conn:
