@@ -236,13 +236,12 @@ let currentModel = {
 };
 let models = [];
 let poller = null;
+let isSending = false;  // блокировка повторной отправки
 
-// Функция сокращения названия провайдера (как было)
 function shortenLabel(provider, name) {
   let p = provider.toLowerCase();
   if (p === 'openrouter') p = 'OR';
   if (p === 'meta-llama') p = 'ml';
-  // можно добавить другие сокращения
   return `${p}: ${name}`;
 }
 
@@ -316,7 +315,6 @@ function renderModelDock() {
 
   modelCurrent.classList.add('admin-clickable');
 
-  // Сортируем модели: сначала groq, потом openrouter, потом остальные по алфавиту
   const sorted = [...models].sort((a, b) => {
     const order = { groq: 1, openrouter: 2 };
     const pa = a.provider.toLowerCase();
@@ -331,7 +329,6 @@ function renderModelDock() {
     const isActive = m.provider === currentModel.provider && m.model === currentModel.model;
     const el = document.createElement('div');
     el.className = 'model-option' + (isActive ? ' active' : '');
-    // Используем shortenLabel для отображения префикса провайдера
     el.textContent = shortenLabel(m.provider, m.name || m.model);
     el.onclick = async (e) => {
       e.stopPropagation();
@@ -424,11 +421,13 @@ async function loadHistory() {
 
 async function sendMessage() {
   const text = input.value.trim();
-  if (!text) return;
+  if (!text || isSending) return;
 
+  isSending = true;
   input.value = '';
   autoResize();
   setThinking(true);
+  sendLabel.style.pointerEvents = 'none';
 
   try {
     if (adminMode) {
@@ -451,7 +450,22 @@ async function sendMessage() {
     }
   } catch (e) {
     console.error(e);
+
+    const wrap = document.createElement('div');
+    wrap.className = 'msgWrap';
+
+    const msg = document.createElement('div');
+    msg.className = 'msg assistant';
+    msg.style.color = '#ff8a8a';
+    msg.style.whiteSpace = 'pre-wrap';
+    msg.textContent = 'Ошибка: ' + ((e && e.message) ? e.message : 'Неизвестная ошибка');
+
+    wrap.appendChild(msg);
+    chatDiv.appendChild(wrap);
+    chatDiv.scrollTop = chatDiv.scrollHeight;
   } finally {
+    isSending = false;
+    sendLabel.style.pointerEvents = '';
     setThinking(false);
   }
 }
@@ -547,6 +561,18 @@ fsZone.addEventListener('click', () => {
   } catch (e) {
     console.error(e);
     chatDiv.innerHTML = '';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'msgWrap';
+
+    const msg = document.createElement('div');
+    msg.className = 'msg assistant';
+    msg.style.color = '#ff8a8a';
+    msg.style.whiteSpace = 'pre-wrap';
+    msg.textContent = 'Ошибка запуска интерфейса: ' + ((e && e.message) ? e.message : 'Неизвестная ошибка');
+
+    wrap.appendChild(msg);
+    chatDiv.appendChild(wrap);
   }
 })();
 </script>
