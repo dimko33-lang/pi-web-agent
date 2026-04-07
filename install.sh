@@ -255,32 +255,39 @@ GLOBAL_FILE = APP / "global_model.json"
 TEMPLATE = APP / "default_terminal.html"
 
 base = "-projects-pi-ru"
-admin_alias = f"{base}-admin-{secrets.token_hex(6)}"
 
-aliases = {
-    base: "default",
-    f"{base}/1": "slot1",
-    f"{base}/2": "slot2",
-    f"{base}/3": "slot3",
-    f"{base}/4": "slot4",
-    f"{base}/5": "slot5",
-    admin_alias: "private",
-}
+if ALIAS_FILE.exists():
+    aliases = json.loads(ALIAS_FILE.read_text(encoding="utf-8"))
+    admin_alias = next((k for k, v in aliases.items() if v == "private"), None)
+else:
+    admin_alias = f"{base}-admin-{secrets.token_hex(6)}"
+    aliases = {
+        base: "default",
+        f"{base}/1": "slot1",
+        f"{base}/2": "slot2",
+        f"{base}/3": "slot3",
+        f"{base}/4": "slot4",
+        f"{base}/5": "slot5",
+        admin_alias: "private",
+    }
+    ALIAS_FILE.write_text(json.dumps(aliases, ensure_ascii=False, indent=2), encoding="utf-8")
 
-ALIAS_FILE.write_text(json.dumps(aliases, ensure_ascii=False, indent=2), encoding="utf-8")
-GLOBAL_FILE.write_text(json.dumps({
-    "provider": "groq",
-    "model": "llama-3.1-8b-instant"
-}, ensure_ascii=False, indent=2), encoding="utf-8")
+if not GLOBAL_FILE.exists():
+    GLOBAL_FILE.write_text(json.dumps({
+        "provider": "groq",
+        "model": "llama-3.1-8b-instant"
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
 
 init_db()
 
 for name in ["default", "slot1", "slot2", "slot3", "slot4", "slot5", "private"]:
     s = get_or_create_session(name, provider="groq", model="llama-3.1-8b-instant")
     update_session_state(s["id"], "groq", "llama-3.1-8b-instant")
-    shutil.copy2(TEMPLATE, session_html_path(s["id"]))
+    dst = session_html_path(s["id"])
+    if not dst.exists():
+        shutil.copy2(TEMPLATE, dst)
 
-print("ADMIN_ALIAS=" + admin_alias)
+print("ADMIN_ALIAS=" + (admin_alias or ""))
 PY
 
 chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR"
