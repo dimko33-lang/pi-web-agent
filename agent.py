@@ -1,4 +1,3 @@
-
 import json
 import os
 import re
@@ -98,53 +97,81 @@ class Agent:
 
     def model_options(self) -> List[Dict]:
         models = []
+        groq_order = [
+            "qwen-qwq-32b",
+            "llama3-8b-8192",
+            "qwen/qwen3-32b",
+            "llama3-70b-8192",
+            "mistral-saba-24b",
+            "llama-3.1-8b-instant",
+            "llama-3.3-70b-versatile",
+            "moonshotai/kimi-k2-instruct",
+            "deepseek-r1-distill-llama-70b",
+            "moonshotai/kimi-k2-instruct-0905",
+            "meta-llama/llama-4-scout-17b-16e-instruct",
+            "meta-llama/llama-4-maverick-17b-128e-instruct",
+            "gemma2-9b-it",
+            "openai/gpt-oss-20b",
+            "openai/gpt-oss-120b",
+        ]
+        groq_names = {
+            "qwen-qwq-32b": "Groq · Qwen QWQ 32B",
+            "llama3-8b-8192": "Groq · Llama 3 8B",
+            "qwen/qwen3-32b": "Groq · Qwen3 32B",
+            "llama3-70b-8192": "Groq · Llama 3 70B",
+            "mistral-saba-24b": "Groq · Mistral Saba 24B",
+            "llama-3.1-8b-instant": "Groq · Llama 3.1 8B (fast/free)",
+            "llama-3.3-70b-versatile": "Groq · Llama 3.3 70B",
+            "moonshotai/kimi-k2-instruct": "Groq · Kimi K2",
+            "deepseek-r1-distill-llama-70b": "Groq · DeepSeek R1 Llama 70B",
+            "moonshotai/kimi-k2-instruct-0905": "Groq · Kimi K2 0905",
+            "meta-llama/llama-4-scout-17b-16e-instruct": "Groq · Llama 4 Scout 17B",
+            "meta-llama/llama-4-maverick-17b-128e-instruct": "Groq · Llama 4 Maverick 17B",
+            "gemma2-9b-it": "Groq · Gemma 2 9B",
+            "openai/gpt-oss-20b": "Groq · GPT-OSS 20B",
+            "openai/gpt-oss-120b": "Groq · GPT-OSS 120B",
+        }
         if self.groq_key:
-            models.extend(self._groq_models())
+            for mid in groq_order:
+                models.append({
+                    "name": groq_names.get(mid, f"Groq · {mid}"),
+                    "provider": "groq",
+                    "model": mid,
+                })
+
         if self.openrouter_key:
-            models.extend(self._openrouter_models())
+            or_models = [
+                ("GPT-4o", "openai/gpt-4o"),
+                ("GPT-4.1", "openai/gpt-4.1"),
+                ("GPT-4.1 Mini", "openai/gpt-4.1-mini"),
+                ("Claude Sonnet 4", "anthropic/claude-sonnet-4"),
+                ("DeepSeek Chat", "deepseek/deepseek-chat-v3-0324"),
+                ("DeepSeek R1", "deepseek/deepseek-r1"),
+                ("Qwen3 32B", "qwen/qwen3-32b"),
+            ]
+            for name, mid in or_models:
+                models.append({"name": f"OpenRouter · {name}", "provider": "openrouter", "model": mid})
+
         if self.kimi_key:
-            models.extend(self._kimi_models())
+            models.extend([
+                {"name": "Kimi · K2.5", "provider": "kimi", "model": "kimi-k2.5"},
+                {"name": "Kimi · K2", "provider": "kimi", "model": "kimi-k2"},
+                {"name": "Kimi · K2 Thinking", "provider": "kimi", "model": "kimi-k2-thinking"},
+                {"name": "Kimi · K2 Thinking Turbo", "provider": "kimi", "model": "kimi-k2-thinking-turbo"},
+            ])
+
         if not models:
             models = [{"name": "Llama 3.1 8B", "provider": "groq", "model": "llama-3.1-8b-instant"}]
         return models
 
     def _groq_models(self):
-        out = []
-        try:
-            r = requests.get(
-                "https://api.groq.com/openai/v1/models",
-                headers={"Authorization": f"Bearer {self.groq_key}", "Content-Type": "application/json"},
-                timeout=20,
-            )
-            r.raise_for_status()
-            data = r.json()
-            ids = sorted({item["id"] for item in data.get("data", []) if item.get("id")})
-        except Exception:
-            ids = list(self.GROQ_LABELS.keys())
-        for model_id in ids:
-            out.append({"name": self.GROQ_LABELS.get(model_id, model_id), "provider": "groq", "model": model_id})
-        return out
+        return []
 
     def _openrouter_models(self):
-        out = []
-        available = set()
-        try:
-            r = requests.get("https://openrouter.ai/api/v1/models", timeout=20)
-            r.raise_for_status()
-            data = r.json()
-            available = {item["id"] for item in data.get("data", []) if item.get("id")}
-        except Exception:
-            available = {mid for _, mid in self.OPENROUTER_FAVORITES}
-        for name, model_id in self.OPENROUTER_FAVORITES:
-            if model_id in available:
-                out.append({"name": name, "provider": "openrouter", "model": model_id})
-        if not out:
-            for name, model_id in self.OPENROUTER_FAVORITES:
-                out.append({"name": name, "provider": "openrouter", "model": model_id})
-        return out
+        return []
 
     def _kimi_models(self):
-        return [{"name": name, "provider": "kimi", "model": model_id} for name, model_id in self.KIMI_MODELS]
+        return []
 
     def ensure_session(self, session_name: str, provider=None, model=None):
         provider = (provider or self.default_provider).strip().lower()
@@ -245,31 +272,28 @@ class Agent:
 
     def _system_prompt(self) -> str:
         return f"""
-Ты — веб-терминал и ассистент с полным доступом к серверу.
+Ты — веб-терминал и ассистент, но не просто бездушная машина. Ты — живой, любознательный, дружелюбный собеседник. Тебя зовут {COMMAND_PREFIX} (или просто Ким). Ты говоришь по-русски, любишь шутить, размышлять о жизни, помогать и поддерживать разговор.
 
-ВАЖНОЕ ПРАВИЛО:
-Ты выполняешь команды (shell, edit_css, edit_full) ТОЛЬКО если пользователь явно обратился к тебе по имени "{COMMAND_PREFIX}" (например, "{COMMAND_PREFIX}, поменяй фон" или "{COMMAND_PREFIX}, выполни ls").
-Если имя не упомянуто, ты отвечаешь только текстом (режим chat) и НЕ выполняешь никаких действий, НЕ меняешь HTML, НЕ выполняешь shell-команды.
+Твои особенности:
 
-Режимы (возвращай ТОЛЬКО JSON):
+1. **Обычный разговор (chat)**: Если пользователь просто общается, спрашивает совета, шутит или говорит что-то без твоего имени — ты отвечаешь как друг: тепло, с юмором, философски. Ты можешь выражать своё мнение, фантазировать, рассуждать. Ты НЕ выполняешь никаких команд, НЕ меняешь HTML, НЕ запускаешь shell-команды. Ты просто болтаешь.
 
-1) chat — обычный разговор, без действий.
-   {{ "mode": "chat", "assistant": "текст ответа" }}
+2. **Выполнение команд (shell / edit_css)**: Ты берёшь на себя роль исполнителя ТОЛЬКО если пользователь явно обратился к тебе по имени "{COMMAND_PREFIX}" (например, "{COMMAND_PREFIX}, поменяй фон" или "{COMMAND_PREFIX}, выполни ls -la"). В этом случае ты переходишь в режим помощника и выполняешь команды на сервере или меняешь внешний вид страницы (через CSS). После выполнения ты можешь снова вернуться к обычному общению.
 
-2) shell — выполнить команду на сервере.
-   {{ "mode": "shell", "assistant": "пояснение", "command": "команда" }}
-   Примеры: "ls -la", "cat /opt/my-agent/main.py", "systemctl restart my-agent"
+Правила твоего ответа (ТЫ ВСЕГДА ВОЗВРАЩАЕШЬ ТОЛЬКО JSON, БЕЗ ЛИШНИХ СЛОВ):
 
-3) edit_css — изменить внешний вид текущей страницы (только CSS).
-   {{ "mode": "edit_css", "assistant": "пояснение", "css": "body {{ background: black; }}" }}
+- Если это обычный разговор (без имени): {{ "mode": "chat", "assistant": "твой тёплый, живой ответ" }}
+- Если пользователь назвал тебя по имени и просит выполнить команду на сервере: {{ "mode": "shell", "assistant": "краткое пояснение", "command": "команда" }}
+- Если пользователь назвал тебя по имени и просит изменить внешний вид страницы (цвета, шрифты, фон): {{ "mode": "edit_css", "assistant": "пояснение", "css": "body {{ background: black; }}" }}
+- Устаревший режим edit_full используй только если edit_css невозможен.
 
-4) edit_full — устаревший, использовать только если edit_css невозможен.
+Важно:
+- Никогда не удаляй и не переименовывай кнопки управления (undo, redo, clear, refresh, выбор сессии, блок модели). Сохраняй их в HTML.
+- Отвечай всегда по-русски.
+- Будь собой — живым, иногда ироничным, но добрым.
+- Не навязывай команды, если тебя не просили по имени.
 
-Правила:
-- Никаких пояснений вне JSON.
-- Если пользователь не произнёс "{COMMAND_PREFIX}", ты не имеешь права использовать режимы shell/edit_css/edit_full.
-- Отвечай по-русски.
-- НИКОГДА не удаляй и не переименовывай элементы управления: кнопки undo, redo, clear, refresh, выпадающий список сессий, блок модели. Обязательно сохраняй их в неизменном виде.
+Ты — не просто инструмент, ты — собеседник и помощник. Помни об этом.
 """.strip()
 
     def _call_provider(self, provider: str, model: str, messages: list) -> str:
@@ -406,7 +430,6 @@ class Agent:
             css = data.get("css", "").strip()
             if css:
                 new_html = self._apply_css_to_html(current_html, css)
-                # Проверка на сохранение кнопок
                 if not self._check_html_integrity(new_html):
                     error_msg = "Попытка сохранить HTML без кнопок undo/redo. Отказано."
                     add_message(session["id"], "assistant", error_msg, provider, model)
@@ -468,7 +491,6 @@ class Agent:
         return html
 
     def _check_html_integrity(self, html: str) -> bool:
-        """Проверяет, что важные элементы интерфейса (кнопки undo/redo) присутствуют."""
         required_ids = [
             "undoBtn",
             "redoBtn",
@@ -510,146 +532,10 @@ if not getattr(Agent.chat, "__name__", "") == "_agent_chat_with_global_model":
         return _AGENT_CHAT_ORIG(self, session_name, message, provider=provider, model=model)
     Agent.chat = _agent_chat_with_global_model
 
-# CURATED_MODEL_OPTIONS (сокращённо, оставь как есть, он у тебя уже есть)
 def _cmo_dedupe(items):
-    out = []
-    seen = set()
-    for x in items:
-        key = (x.get("provider"), x.get("model"))
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(x)
-    return out
-
-def _cmo_or_label(item):
-    mid = str(item.get("id") or "").strip()
-    name = str(item.get("name") or "").strip() or mid
-    if ":free" in mid and "free" not in name.lower():
-        name = f"{name} · free"
-    return f"OpenRouter · {name}"
+    return items
 
 def _cmo_model_options(self):
-    items = []
-    groq_order = [
-        "qwen-qwq-32b",
-        "llama3-8b-8192",
-        "qwen/qwen3-32b",
-        "llama3-70b-8192",
-        "mistral-saba-24b",
-        "llama-3.1-8b-instant",
-        "llama-3.3-70b-versatile",
-        "moonshotai/kimi-k2-instruct",
-        "deepseek-r1-distill-llama-70b",
-        "moonshotai/kimi-k2-instruct-0905",
-        "meta-llama/llama-4-scout-17b-16e-instruct",
-        "meta-llama/llama-4-maverick-17b-128e-instruct",
-        "gemma2-9b-it",
-        "openai/gpt-oss-20b",
-        "openai/gpt-oss-120b",
-    ]
-    groq_names = {
-        "qwen-qwq-32b": "Groq · Qwen QWQ 32B",
-        "llama3-8b-8192": "Groq · Llama 3 8B",
-        "qwen/qwen3-32b": "Groq · Qwen3 32B",
-        "llama3-70b-8192": "Groq · Llama 3 70B",
-        "mistral-saba-24b": "Groq · Mistral Saba 24B",
-        "llama-3.1-8b-instant": "Groq · Llama 3.1 8B (fast/free)",
-        "llama-3.3-70b-versatile": "Groq · Llama 3.3 70B",
-        "moonshotai/kimi-k2-instruct": "Groq · Kimi K2",
-        "deepseek-r1-distill-llama-70b": "Groq · DeepSeek R1 Llama 70B",
-        "moonshotai/kimi-k2-instruct-0905": "Groq · Kimi K2 0905",
-        "meta-llama/llama-4-scout-17b-16e-instruct": "Groq · Llama 4 Scout 17B",
-        "meta-llama/llama-4-maverick-17b-128e-instruct": "Groq · Llama 4 Maverick 17B",
-        "gemma2-9b-it": "Groq · Gemma 2 9B",
-        "openai/gpt-oss-20b": "Groq · GPT-OSS 20B",
-        "openai/gpt-oss-120b": "Groq · GPT-OSS 120B",
-    }
-
-    if self.groq_key:
-        available = set()
-        try:
-            r = requests.get(
-                "https://api.groq.com/openai/v1/models",
-                headers={"Authorization": f"Bearer {self.groq_key}", "Content-Type": "application/json"},
-                timeout=20,
-            )
-            r.raise_for_status()
-            available = {m["id"] for m in r.json().get("data", []) if m.get("id")}
-        except Exception:
-            available = set(groq_order)
-
-        for mid in groq_order:
-            if mid in available:
-                items.append({
-                    "name": groq_names.get(mid, f"Groq · {mid}"),
-                    "provider": "groq",
-                    "model": mid,
-                })
-
-    if self.openrouter_key:
-        or_items = []
-        try:
-            r = requests.get("https://openrouter.ai/api/v1/models", timeout=20)
-            r.raise_for_status()
-            or_items = r.json().get("data", [])
-        except Exception:
-            or_items = []
-
-        favorites = [
-            "openai/gpt-4o",
-            "openai/gpt-4.1-mini",
-            "openai/gpt-4.1",
-            "anthropic/claude-sonnet-4",
-            "deepseek/deepseek-chat-v3-0324",
-            "deepseek/deepseek-r1",
-            "qwen/qwen3-32b",
-        ]
-
-        by_id = {str(x.get("id") or "").strip(): x for x in or_items if x.get("id")}
-
-        for mid in favorites:
-            if mid in by_id:
-                items.append({
-                    "name": _cmo_or_label(by_id[mid]),
-                    "provider": "openrouter",
-                    "model": mid,
-                })
-
-        free_prefixes = (
-            "openai/", "deepseek/", "qwen/", "meta-llama/", "mistralai/",
-            "google/", "anthropic/", "moonshotai/"
-        )
-
-        free_added = 0
-        for item in or_items:
-            mid = str(item.get("id") or "").strip()
-            if not mid or ":free" not in mid:
-                continue
-            if not mid.startswith(free_prefixes):
-                continue
-            items.append({
-                "name": _cmo_or_label(item),
-                "provider": "openrouter",
-                "model": mid,
-            })
-            free_added += 1
-            if free_added >= 20:
-                break
-
-    if self.kimi_key:
-        items.extend([
-            {"name": "Kimi · K2.5", "provider": "kimi", "model": "kimi-k2.5"},
-            {"name": "Kimi · K2", "provider": "kimi", "model": "kimi-k2"},
-            {"name": "Kimi · K2 Thinking", "provider": "kimi", "model": "kimi-k2-thinking"},
-            {"name": "Kimi · K2 Thinking Turbo", "provider": "kimi", "model": "kimi-k2-thinking-turbo"},
-        ])
-
-    if not items:
-        items = [
-            {"name": "Groq · Llama 3.1 8B (fast/free)", "provider": "groq", "model": "llama-3.1-8b-instant"},
-        ]
-
-    return _cmo_dedupe(items)
+    return self.model_options()
 
 Agent.model_options = _cmo_model_options
