@@ -111,9 +111,12 @@ fi
 
 PI_PUBLIC_URL="http://${PUBLIC_HOST}"
 
-log "Installing packages"
+log "Installing packages (python3, nginx, rsync, git, curl, wget, chromium-browser)"
 aptx update
-aptx install -y --no-install-recommends python3-full python3-venv nginx rsync git curl
+aptx install -y --no-install-recommends python3-full python3-venv nginx rsync git curl wget chromium-browser
+
+log "Adding my-agent to snap group (for chromium)"
+usermod -a -G snap "$SERVICE_USER" 2>/dev/null || true
 
 log "Creating service user"
 id -u "$SERVICE_USER" >/dev/null 2>&1 || \
