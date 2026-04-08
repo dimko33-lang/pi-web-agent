@@ -96,7 +96,7 @@ class Agent:
         return model or "Unknown"
 
     def model_options(self) -> List[Dict]:
-        """Возвращает список моделей: GROQ, Kimi, OpenRouter (с сортировкой: auto, free, бесплатные, остальные)."""
+        """Возвращает список моделей: GROQ, Kimi, OpenRouter (сортировка: auto, free, бесплатные, остальные)."""
         models = []
 
         # 1. GROQ
@@ -137,9 +137,14 @@ class Agent:
                         continue
                     name = item.get("name") or mid
                     is_free = ":free" in mid
-                    display_name = f"OpenRouter · {name}"
-                    if is_free:
-                        display_name += " · free"
+                    if mid == "openrouter/auto":
+                        display_name = "OpenRouter · auto (automatic)"
+                    elif mid == "openrouter/free":
+                        display_name = "OpenRouter · free (automatic free tier)"
+                    else:
+                        display_name = f"OpenRouter · {name}"
+                        if is_free:
+                            display_name += " · free"
                     or_models.append({
                         "name": display_name,
                         "provider": "openrouter",
@@ -147,7 +152,7 @@ class Agent:
                         "_is_free": is_free,
                         "_id": mid
                     })
-                # Сортировка: сначала auto, потом free (спецмодель), потом бесплатные, потом остальные
+                # Сортировка: сначала auto, потом free, потом бесплатные, потом остальные
                 def sort_key(m):
                     mid = m["_id"]
                     if mid == "openrouter/auto":
@@ -162,8 +167,8 @@ class Agent:
                     models.append({"name": m["name"], "provider": m["provider"], "model": m["model"]})
             except Exception:
                 # fallback
-                models.append({"name": "OpenRouter · auto", "provider": "openrouter", "model": "openrouter/auto"})
-                models.append({"name": "OpenRouter · free", "provider": "openrouter", "model": "openrouter/free"})
+                models.append({"name": "OpenRouter · auto (automatic)", "provider": "openrouter", "model": "openrouter/auto"})
+                models.append({"name": "OpenRouter · free (automatic free tier)", "provider": "openrouter", "model": "openrouter/free"})
                 for name, mid in self.OPENROUTER_FAVORITES:
                     models.append({"name": f"OpenRouter · {name}", "provider": "openrouter", "model": mid})
 
