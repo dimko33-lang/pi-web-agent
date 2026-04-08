@@ -125,7 +125,7 @@ def resolve_context():
 
 @app.after_request
 def add_no_cache_headers(response):
-    if request.path in {"/", "/events", "/session_html"}:
+    if request.path in {"/", "/events"}:
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
     return response
@@ -149,24 +149,6 @@ def index():
     resp.set_cookie("pi_admin", "1" if admin_mode else "0", max_age=86400*30, httponly=False, samesite="Lax")
     resp.set_cookie("pi_target_session", target, max_age=86400*30, httponly=False, samesite="Lax")
     return resp
-
-@app.get("/session_html")
-def get_session_html():
-    """Возвращает HTML выбранной сессии (для админки)"""
-    ctx = resolve_context()
-    if not ctx.get("ok") or not ctx.get("admin"):
-        return jsonify({"success": False, "error": "forbidden"}), 403
-
-    session_name = request.args.get("session", "").strip()
-    if not session_name:
-        return jsonify({"success": False, "error": "session name required"}), 400
-
-    session = get_session(session_name)
-    if not session:
-        return jsonify({"success": False, "error": "session not found"}), 404
-
-    html = read_session_html(session["id"])
-    return jsonify({"success": True, "html": html})
 
 @app.get("/healthz")
 def healthz():
