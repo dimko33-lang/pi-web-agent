@@ -96,12 +96,10 @@ class Agent:
         return model or "Unknown"
 
     def model_options(self) -> List[Dict]:
-        """Возвращает список моделей от всех провайдеров в порядке: GROQ, Kimi, OpenRouter.
-           Для OpenRouter сортирует: сначала openrouter/auto, потом :free, потом остальные.
-        """
+        """Возвращает список моделей: GROQ, Kimi, OpenRouter (с сортировкой: auto, free, бесплатные, остальные)."""
         models = []
 
-        # 1. GROQ — запрашиваем API
+        # 1. GROQ
         if self.groq_key:
             try:
                 r = requests.get(
@@ -116,21 +114,17 @@ class Agent:
                     name = self.GROQ_LABELS.get(mid, f"Groq · {mid}")
                     models.append({"name": name, "provider": "groq", "model": mid})
             except Exception:
-                # Если API недоступен, показываем хотя бы стандартный набор
-                fallback = [
-                    "llama-3.1-8b-instant", "llama-3.3-70b-versatile", "qwen-qwq-32b",
-                    "llama3-8b-8192", "llama3-70b-8192"
-                ]
+                fallback = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile", "qwen-qwq-32b"]
                 for mid in fallback:
                     name = self.GROQ_LABELS.get(mid, f"Groq · {mid}")
                     models.append({"name": name, "provider": "groq", "model": mid})
 
-        # 2. Kimi — фиксированный список
+        # 2. Kimi
         if self.kimi_key:
             for name, mid in self.KIMI_MODELS:
                 models.append({"name": f"Kimi · {name}", "provider": "kimi", "model": mid})
 
-        # 3. OpenRouter — запрашиваем API и сортируем
+        # 3. OpenRouter
         if self.openrouter_key:
             try:
                 r = requests.get("https://openrouter.ai/api/v1/models", timeout=10)
@@ -142,19 +136,34 @@ class Agent:
                     if not mid:
                         continue
                     name = item.get("name") or mid
-                    or_models.append({"name": f"OpenRouter · {name}", "provider": "openrouter", "model": mid})
-                # Сортируем: сначала openrouter/auto, потом :free, потом остальные по имени
+                    is_free = ":free" in mid
+                    display_name = f"OpenRouter · {name}"
+                    if is_free:
+                        display_name += " · free"
+                    or_models.append({
+                        "name": display_name,
+                        "provider": "openrouter",
+                        "model": mid,
+                        "_is_free": is_free,
+                        "_id": mid
+                    })
+                # Сортировка: сначала auto, потом free (спецмодель), потом бесплатные, потом остальные
                 def sort_key(m):
-                    mid = m["model"]
+                    mid = m["_id"]
                     if mid == "openrouter/auto":
                         return (0, "")
-                    if ":free" in mid:
-                        return (1, mid)
-                    return (2, mid)
+                    if mid == "openrouter/free":
+                        return (1, "")
+                    if m["_is_free"]:
+                        return (2, mid)
+                    return (3, mid)
                 or_models.sort(key=sort_key)
-                models.extend(or_models)
+                for m in or_models:
+                    models.append({"name": m["name"], "provider": m["provider"], "model": m["model"]})
             except Exception:
-                # Если API не ответил, показываем хотя бы избранные
+                # fallback
+                models.append({"name": "OpenRouter · auto", "provider": "openrouter", "model": "openrouter/auto"})
+                models.append({"name": "OpenRouter · free", "provider": "openrouter", "model": "openrouter/free"})
                 for name, mid in self.OPENROUTER_FAVORITES:
                     models.append({"name": f"OpenRouter · {name}", "provider": "openrouter", "model": mid})
 
