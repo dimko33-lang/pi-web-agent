@@ -96,8 +96,9 @@ class Agent:
         return model or "Unknown"
 
     def model_options(self) -> List[Dict]:
-        """Возвращает список моделей: GROQ → Kimi → OpenRouter (с сортировкой: auto, free, бесплатные, остальные)."""
+        """Принудительный порядок: GROQ → Kimi → OpenRouter. У бесплатных OpenRouter добавляется '· free'."""
         models = []
+        print("DEBUG: model_options called")  # для логов сервера
 
         # 1. GROQ
         if self.groq_key:
@@ -113,7 +114,8 @@ class Agent:
                 for mid in groq_ids:
                     name = self.GROQ_LABELS.get(mid, f"Groq · {mid}")
                     models.append({"name": name, "provider": "groq", "model": mid})
-            except Exception:
+            except Exception as e:
+                print(f"GROQ API error: {e}")
                 fallback = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile", "qwen-qwq-32b"]
                 for mid in fallback:
                     name = self.GROQ_LABELS.get(mid, f"Groq · {mid}")
@@ -130,44 +132,35 @@ class Agent:
                 r = requests.get("https://openrouter.ai/api/v1/models", timeout=10)
                 r.raise_for_status()
                 or_data = r.json().get("data", [])
-                or_models = []
+                # Сначала добавим специальные модели auto и free
+                special = []
+                others = []
                 for item in or_data:
                     mid = item.get("id")
                     if not mid:
                         continue
                     name = item.get("name") or mid
                     is_free = ":free" in mid
+                    display_name = f"OpenRouter · {name}"
+                    if is_free and mid not in ("openrouter/auto", "openrouter/free"):
+                        display_name += " · free"
+                    entry = {"name": display_name, "provider": "openrouter", "model": mid, "_is_free": is_free, "_id": mid}
                     if mid == "openrouter/auto":
-                        display_name = "OpenRouter · auto (automatic)"
+                        entry["name"] = "OpenRouter · auto (automatic)"
+                        special.insert(0, entry)
                     elif mid == "openrouter/free":
-                        display_name = "OpenRouter · free (automatic free tier)"
+                        entry["name"] = "OpenRouter · free (automatic free tier)"
+                        special.append(entry)
                     else:
-                        display_name = f"OpenRouter · {name}"
-                        if is_free:
-                            display_name += " · free"
-                    or_models.append({
-                        "name": display_name,
-                        "provider": "openrouter",
-                        "model": mid,
-                        "_is_free": is_free,
-                        "_id": mid
-                    })
-                # Сортировка: сначала auto, потом free, потом бесплатные, потом остальные
-                def sort_key(m):
-                    mid = m["_id"]
-                    if mid == "openrouter/auto":
-                        return (0, "")
-                    if mid == "openrouter/free":
-                        return (1, "")
-                    if m["_is_free"]:
-                        return (2, mid)
-                    return (3, mid)
-                or_models.sort(key=sort_key)
+                        others.append(entry)
+                # Сортируем остальные: сначала бесплатные, потом остальные
+                others.sort(key=lambda x: (0 if x["_is_free"] else 1, x["_id"]))
+                # Собираем итоговый список OpenRouter
+                or_models = special + others
                 for m in or_models:
                     models.append({"name": m["name"], "provider": m["provider"], "model": m["model"]})
             except Exception as e:
                 print(f"OpenRouter API error: {e}")
-                # fallback
                 models.append({"name": "OpenRouter · auto (automatic)", "provider": "openrouter", "model": "openrouter/auto"})
                 models.append({"name": "OpenRouter · free (automatic free tier)", "provider": "openrouter", "model": "openrouter/free"})
                 for name, mid in self.OPENROUTER_FAVORITES:
@@ -176,6 +169,7 @@ class Agent:
         if not models:
             models = [{"name": "Llama 3.1 8B", "provider": "groq", "model": "llama-3.1-8b-instant"}]
 
+        print(f"DEBUG: total models = {len(models)}")  # для логов
         return models
 
     def ensure_session(self, session_name: str, provider=None, model=None):
