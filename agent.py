@@ -96,82 +96,71 @@ class Agent:
         return model or "Unknown"
 
     def model_options(self) -> List[Dict]:
-        """Возвращает ВСЕ модели из списка, без проверки через API."""
+        """Возвращает список моделей от всех провайдеров в порядке: GROQ, Kimi, OpenRouter.
+           Для OpenRouter сортирует: сначала openrouter/auto, потом :free, потом остальные.
+        """
         models = []
-        # Все модели Groq из списка (18 штук)
-        groq_order = [
-            "groq/compound",
-            "groq/compound-mini",
-            "qwen-qwq-32b",
-            "llama3-8b-8192",
-            "qwen/qwen3-32b",
-            "llama3-70b-8192",
-            "mistral-saba-24b",
-            "llama-3.1-8b-instant",
-            "llama-3.3-70b-versatile",
-            "moonshotai/kimi-k2-instruct",
-            "deepseek-r1-distill-llama-70b",
-            "moonshotai/kimi-k2-instruct-0905",
-            "meta-llama/llama-4-scout-17b-16e-instruct",
-            "meta-llama/llama-4-maverick-17b-128e-instruct",
-            "gemma2-9b-it",
-            "openai/gpt-oss-20b",
-            "openai/gpt-oss-120b",
-            "openai/gpt-oss-safeguard-20b",
-        ]
-        groq_names = {
-            "groq/compound": "Groq · Compound",
-            "groq/compound-mini": "Groq · Compound Mini",
-            "qwen-qwq-32b": "Groq · Qwen QWQ 32B",
-            "llama3-8b-8192": "Groq · Llama 3 8B",
-            "qwen/qwen3-32b": "Groq · Qwen3 32B",
-            "llama3-70b-8192": "Groq · Llama 3 70B",
-            "mistral-saba-24b": "Groq · Mistral Saba 24B",
-            "llama-3.1-8b-instant": "Groq · Llama 3.1 8B (fast/free)",
-            "llama-3.3-70b-versatile": "Groq · Llama 3.3 70B",
-            "moonshotai/kimi-k2-instruct": "Groq · Kimi K2",
-            "deepseek-r1-distill-llama-70b": "Groq · DeepSeek R1 Llama 70B",
-            "moonshotai/kimi-k2-instruct-0905": "Groq · Kimi K2 0905",
-            "meta-llama/llama-4-scout-17b-16e-instruct": "Groq · Llama 4 Scout 17B",
-            "meta-llama/llama-4-maverick-17b-128e-instruct": "Groq · Llama 4 Maverick 17B",
-            "gemma2-9b-it": "Groq · Gemma 2 9B",
-            "openai/gpt-oss-20b": "Groq · GPT-OSS 20B",
-            "openai/gpt-oss-120b": "Groq · GPT-OSS 120B",
-            "openai/gpt-oss-safeguard-20b": "Groq · GPT-OSS Safe 20B",
-        }
+
+        # 1. GROQ — запрашиваем API
         if self.groq_key:
-            for mid in groq_order:
-                models.append({
-                    "name": groq_names.get(mid, f"Groq · {mid}"),
-                    "provider": "groq",
-                    "model": mid,
-                })
+            try:
+                r = requests.get(
+                    "https://api.groq.com/openai/v1/models",
+                    headers={"Authorization": f"Bearer {self.groq_key}", "Content-Type": "application/json"},
+                    timeout=10,
+                )
+                r.raise_for_status()
+                data = r.json()
+                groq_ids = sorted({item["id"] for item in data.get("data", []) if item.get("id")})
+                for mid in groq_ids:
+                    name = self.GROQ_LABELS.get(mid, f"Groq · {mid}")
+                    models.append({"name": name, "provider": "groq", "model": mid})
+            except Exception:
+                # Если API недоступен, показываем хотя бы стандартный набор
+                fallback = [
+                    "llama-3.1-8b-instant", "llama-3.3-70b-versatile", "qwen-qwq-32b",
+                    "llama3-8b-8192", "llama3-70b-8192"
+                ]
+                for mid in fallback:
+                    name = self.GROQ_LABELS.get(mid, f"Groq · {mid}")
+                    models.append({"name": name, "provider": "groq", "model": mid})
 
-        # OpenRouter модели (без фильтрации)
-        if self.openrouter_key:
-            or_models = [
-                ("GPT-4o", "openai/gpt-4o"),
-                ("GPT-4.1", "openai/gpt-4.1"),
-                ("GPT-4.1 Mini", "openai/gpt-4.1-mini"),
-                ("Claude Sonnet 4", "anthropic/claude-sonnet-4"),
-                ("DeepSeek Chat", "deepseek/deepseek-chat-v3-0324"),
-                ("DeepSeek R1", "deepseek/deepseek-r1"),
-                ("Qwen3 32B", "qwen/qwen3-32b"),
-            ]
-            for name, mid in or_models:
-                models.append({"name": f"OpenRouter · {name}", "provider": "openrouter", "model": mid})
-
-        # Kimi модели
+        # 2. Kimi — фиксированный список (можно заменить на API, если появится)
         if self.kimi_key:
-            models.extend([
-                {"name": "Kimi · K2.5", "provider": "kimi", "model": "kimi-k2.5"},
-                {"name": "Kimi · K2", "provider": "kimi", "model": "kimi-k2"},
-                {"name": "Kimi · K2 Thinking", "provider": "kimi", "model": "kimi-k2-thinking"},
-                {"name": "Kimi · K2 Thinking Turbo", "provider": "kimi", "model": "kimi-k2-thinking-turbo"},
-            ])
+            for name, mid in self.KIMI_MODELS:
+                models.append({"name": f"Kimi · {name}", "provider": "kimi", "model": mid})
+
+        # 3. OpenRouter — запрашиваем API и сортируем
+        if self.openrouter_key:
+            try:
+                r = requests.get("https://openrouter.ai/api/v1/models", timeout=10)
+                r.raise_for_status()
+                or_data = r.json().get("data", [])
+                or_models = []
+                for item in or_data:
+                    mid = item.get("id")
+                    if not mid:
+                        continue
+                    name = item.get("name") or mid
+                    or_models.append({"name": f"OpenRouter · {name}", "provider": "openrouter", "model": mid})
+                # Сортируем: сначала openrouter/auto, потом :free, потом остальные по имени
+                def sort_key(m):
+                    mid = m["model"]
+                    if mid == "openrouter/auto":
+                        return (0, "")
+                    if ":free" in mid:
+                        return (1, mid)
+                    return (2, mid)
+                or_models.sort(key=sort_key)
+                models.extend(or_models)
+            except Exception:
+                # Если API не ответил, показываем хотя бы избранные
+                for name, mid in self.OPENROUTER_FAVORITES:
+                    models.append({"name": f"OpenRouter · {name}", "provider": "openrouter", "model": mid})
 
         if not models:
             models = [{"name": "Llama 3.1 8B", "provider": "groq", "model": "llama-3.1-8b-instant"}]
+
         return models
 
     def ensure_session(self, session_name: str, provider=None, model=None):
@@ -520,7 +509,7 @@ if not getattr(Agent.chat, "__name__", "") == "_agent_chat_with_global_model":
         return _AGENT_CHAT_ORIG(self, session_name, message, provider=provider, model=model)
     Agent.chat = _agent_chat_with_global_model
 
-# Для совместимости
+# Для совместимости с вызовом model_options
 def _cmo_dedupe(items):
     return items
 
