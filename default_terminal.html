@@ -975,9 +975,10 @@ input.addEventListener('keydown', (e) => {
 
 sessionSelect.addEventListener('change', async () => {
   currentSession = sessionSelect.value;
-  localStorage.setItem('pi_admin_target_session', currentSession);
-  disarmClearButton();
-  await loadHistory();
+  // Устанавливаем cookie для сервера
+  document.cookie = `pi_target_session=${currentSession}; path=/; max-age=2592000`;
+  // Принудительная перезагрузка без кэша
+  location.reload(true);
 });
 
 undoBtn.onclick = async () => {
