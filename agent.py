@@ -125,7 +125,7 @@ class Agent:
                     name = self.GROQ_LABELS.get(mid, f"Groq · {mid}")
                     models.append({"name": name, "provider": "groq", "model": mid})
 
-        # 2. Kimi — фиксированный список (можно заменить на API, если появится)
+        # 2. Kimi — фиксированный список
         if self.kimi_key:
             for name, mid in self.KIMI_MODELS:
                 models.append({"name": f"Kimi · {name}", "provider": "kimi", "model": mid})
@@ -508,12 +508,3 @@ if not getattr(Agent.chat, "__name__", "") == "_agent_chat_with_global_model":
             provider, model = gp, gm
         return _AGENT_CHAT_ORIG(self, session_name, message, provider=provider, model=model)
     Agent.chat = _agent_chat_with_global_model
-
-# Для совместимости с вызовом model_options
-def _cmo_dedupe(items):
-    return items
-
-def _cmo_model_options(self):
-    return self.model_options()
-
-Agent.model_options = _cmo_model_options
