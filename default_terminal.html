@@ -9,11 +9,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&display=swap');
 
 :root{
-    --dock-right-pad:8px; /* одна и та же правая линия для активной модели и списка */
-}
-
-*{
-    box-sizing:border-box;
+    --dock-right-gap:12px; /* увеличен отступ для названия модели от правого края */
 }
 
 html, body{
@@ -60,6 +56,7 @@ body{
     padding:8px 12px;
     height:35px;
     min-height:35px;
+    box-sizing:border-box;
     outline:none;
     resize:none;
     line-height:1.4;
@@ -120,67 +117,16 @@ body{
     flex:0 0 auto;
     letter-spacing:0.01em;
     font-style: italic;
-    margin-right:auto;
+    margin-right: auto;  /* Это прижимает всё остальное вправо */
 }
 
-#rightGroup{
-    margin-left:auto;
-    display:flex;
-    align-items:center;
-    gap:2px; /* было далеко, теперь почти вплотную */
-    flex-shrink:0;
-    min-width:0;
-}
-
-/* Публичные кнопки (только undo/redo) */
-#publicControls{
-    display:none;
-    align-items:center;
-    gap:2px;
-}
-
-#publicControls button{
-    background:rgba(255,255,255,0.08);
-    color:#fff;
-    border:1px solid rgba(255,255,255,0.18);
-    border-radius:2px;
-    font-family:'Inter',system-ui,sans-serif;
-    font-size:10px;
-    font-style: italic;
-    font-weight:500;
-    letter-spacing:0.02em;
-    backdrop-filter:blur(4px);
-    -webkit-backdrop-filter:blur(4px);
-    transition:all 0.2s;
-    height:20px;
-    min-height:20px;
-    padding:0 7px;
-    min-width:42px;
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    line-height:1;
-    cursor:pointer;
-}
-
-#publicControls button:hover{
-    background:rgba(255,255,255,0.12);
-    border-color:rgba(255,255,255,0.26);
-}
-
-/* Админские кнопки */
 #adminControls{
     display:none;
     align-items:center;
-    gap:2px;
+    gap:4px;
     min-width:0;
     flex:0 1 auto;
-    overflow-x:auto;
-    scrollbar-width:none;
-}
-
-#adminControls::-webkit-scrollbar{
-    display:none;
+    justify-content:flex-end;
 }
 
 #adminControls select,
@@ -199,6 +145,7 @@ body{
     transition:all 0.2s;
     vertical-align:middle;
     margin:0;
+    box-sizing:border-box;
 }
 
 #adminControls button{
@@ -232,14 +179,13 @@ body{
     border-color:rgba(255,255,255,0.26);
 }
 
-/* Блок моде��и */
 #modelDock{
+    margin-left:0;
     position:relative;
-    flex:0 0 128px;       /* уже, чтобы кнопки были ближе */
-    width:128px;
-    min-width:128px;
-    max-width:128px;
-    margin-right:-10px;   /* прижимает dropdown к правому краю экрана */
+    flex:0 0 150px;
+    width:150px;
+    min-width:150px;
+    max-width:150px;
 }
 
 #modelCurrent{
@@ -254,11 +200,10 @@ body{
     font-weight:500;
     opacity:0.68;
     text-align:right;
-    padding-right:var(--dock-right-pad);
+    padding-right:var(--dock-right-gap);
     cursor:pointer;
     letter-spacing:0.01em;
     font-style: italic;
-    user-select:none;
 }
 
 #modelCurrent.admin-clickable{
@@ -285,13 +230,12 @@ body{
 
 .model-option{
     position:relative;
-    padding:7px var(--dock-right-pad) 7px 10px;
+    padding:7px 12px 7px 10px; /* правый отступ 12px */
     color:rgba(255,255,255,0.72);
     font-size:10px;
     cursor:pointer;
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
+    white-space:normal;  /* разрешаем перенос строк, чтобы длинные названия не обрезались */
+    word-break:break-word;
     font-family:'Inter',system-ui,sans-serif;
     font-weight:500;
     font-style: italic;
@@ -392,28 +336,15 @@ body{
         overflow:hidden;
     }
 
-    #rightGroup{
-        gap:2px;
-        max-width:calc(100vw - 112px);
-        flex-shrink:1;
-        min-width:0;
-    }
-
-    #publicControls{
-        gap:2px;
-    }
-
-    #publicControls button{
-        height:19px;
-        min-height:19px;
-        padding:0 5px;
-        min-width:38px;
-        font-size:9px;
-    }
-
     #adminControls{
-        gap:2px;
+        gap:4px;
+        justify-content:flex-end;
         overflow-x:auto;
+        scrollbar-width:none;
+    }
+
+    #adminControls::-webkit-scrollbar{
+        display:none;
     }
 
     #adminControls select,
@@ -439,25 +370,26 @@ body{
     }
 
     #modelDock{
-        flex:0 0 108px;
-        width:108px;
-        min-width:108px;
-        max-width:108px;
-        margin-right:-10px;
+        flex:0 0 118px;
+        width:118px;
+        min-width:118px;
+        max-width:118px;
     }
 
     #modelCurrent{
         max-width:100%;
         font-size:10px;
-        padding-right:var(--dock-right-pad);
-    }
-
-    .model-option{
-        padding-right:var(--dock-right-pad);
+        padding-right:8px;
     }
 
     #modelDropdown{
         max-width:92vw;
+    }
+
+    .model-option{
+        white-space:normal;
+        word-break:break-word;
+        padding:7px 8px;
     }
 
     .msg{
@@ -496,25 +428,16 @@ body{
 
 <div id="bottomBar">
   <div id="pathDisplay">~/projects/pi-ru</div>
-
-  <div id="rightGroup">
-    <div id="publicControls">
-      <button id="publicUndoBtn" type="button">undo</button>
-      <button id="publicRedoBtn" type="button">redo</button>
-    </div>
-
-    <div id="adminControls">
-      <select id="sessionSelect"></select>
-      <button id="undoBtn" type="button">undo</button>
-      <button id="redoBtn" type="button">redo</button>
-      <button id="clearBtn" type="button">clear</button>
-      <button id="refreshBtn" type="button">refresh</button>
-    </div>
-
-    <div id="modelDock">
-      <div id="modelCurrent"></div>
-      <div id="modelDropdown"></div>
-    </div>
+  <div id="adminControls">
+    <select id="sessionSelect"></select>
+    <button id="undoBtn" type="button">undo</button>
+    <button id="redoBtn" type="button">redo</button>
+    <button id="clearBtn" type="button">clear</button>
+    <button id="refreshBtn" type="button">refresh</button>
+  </div>
+  <div id="modelDock">
+    <div id="modelCurrent">Loading...</div>
+    <div id="modelDropdown"></div>
   </div>
 </div>
 
@@ -523,7 +446,6 @@ body{
 <script>
 const rawAlias = location.search.length > 1 ? decodeURIComponent(location.search.slice(1)) : '';
 const ADMIN_HEADER = rawAlias;
-const MODEL_LABEL_STORAGE_KEY = 'pi_last_model_label';
 
 const chatDiv = document.getElementById('chatMessages');
 const input = document.getElementById('messageInput');
@@ -532,14 +454,11 @@ const pathDisplay = document.getElementById('pathDisplay');
 const fsZone = document.getElementById('fullscreenZone');
 
 const adminControls = document.getElementById('adminControls');
-const publicControls = document.getElementById('publicControls');
 const sessionSelect = document.getElementById('sessionSelect');
 const undoBtn = document.getElementById('undoBtn');
 const redoBtn = document.getElementById('redoBtn');
 const clearBtn = document.getElementById('clearBtn');
 const refreshBtn = document.getElementById('refreshBtn');
-const publicUndoBtn = document.getElementById('publicUndoBtn');
-const publicRedoBtn = document.getElementById('publicRedoBtn');
 
 const modelCurrent = document.getElementById('modelCurrent');
 const modelDropdown = document.getElementById('modelDropdown');
@@ -549,7 +468,7 @@ let currentSession = 'default';
 let currentModel = {
   provider: 'groq',
   model: 'llama-3.1-8b-instant',
-  label: 'llama 3.1 8B'
+  label: 'Groq · Llama 3.1 8B (fast/free)'
 };
 let models = [];
 let poller = null;
@@ -661,24 +580,20 @@ function providerShort(provider) {
   return String(provider || '').trim();
 }
 
+// Для кнопки модели используем короткое название
 function currentModelLabel(provider, name) {
   return compactModelName(name, 18);
 }
 
+// Для выпадающего списка используем ПОЛНОЕ название (без обрезания)
 function dropdownModelLabel(provider, name) {
-  return `${providerShort(provider)}: ${humanModelName(name)}`;
-}
-
-function setVisibleModelLabel(label) {
-  const safe = String(label || '').trim();
-  if (!safe) return;
-  modelCurrent.textContent = safe;
-  localStorage.setItem(MODEL_LABEL_STORAGE_KEY, safe);
-}
-
-function seedModelLabelFromStorage() {
-  const saved = localStorage.getItem(MODEL_LABEL_STORAGE_KEY);
-  modelCurrent.textContent = saved || currentModel.label || 'model';
+  // Получаем человекочитаемое полное имя
+  let fullName = humanModelName(name);
+  // Если есть суффикс "free" в оригинальном имени, добавляем его в начало
+  if (name && name.includes('free')) {
+    return `FREE · ${providerShort(provider)} · ${fullName}`;
+  }
+  return `${providerShort(provider)} · ${fullName}`;
 }
 
 function setThinking(v) {
@@ -765,9 +680,7 @@ function renderHistory(items) {
 
 function renderModelDock() {
   const rawName = currentModel.model || currentModel.label || '';
-  const label = currentModelLabel(currentModel.provider, rawName);
-
-  setVisibleModelLabel(label);
+  modelCurrent.textContent = currentModelLabel(currentModel.provider, rawName);
   modelCurrent.title = humanModelName(rawName);
   modelDropdown.innerHTML = '';
 
@@ -793,8 +706,12 @@ function renderModelDock() {
     const isActive = m.provider === currentModel.provider && m.model === currentModel.model;
     const el = document.createElement('div');
     el.className = 'model-option' + (isActive ? ' active' : '');
+    // Используем полное название (без обрезания)
     el.textContent = dropdownModelLabel(m.provider, m.model || m.name || '');
     el.title = m.model || m.name || '';
+    // Разрешаем перенос строк
+    el.style.whiteSpace = 'normal';
+    el.style.wordBreak = 'break-word';
 
     el.onclick = async (e) => {
       e.stopPropagation();
@@ -844,7 +761,6 @@ async function loadModels() {
 async function loadPublic() {
   adminMode = false;
   adminControls.style.display = 'none';
-  publicControls.style.display = 'flex';
   pathDisplay.textContent = '~/projects/pi-ru';
   await syncGlobalModel();
   await loadHistory();
@@ -853,7 +769,6 @@ async function loadPublic() {
 async function loadAdmin() {
   adminMode = true;
   adminControls.style.display = 'flex';
-  publicControls.style.display = 'none';
   pathDisplay.textContent = '~/projects/pi-ru';
 
   const state = await api('GET', '/admin/state', null, true);
@@ -987,26 +902,6 @@ redoBtn.onclick = async () => {
   }
 };
 
-publicUndoBtn.onclick = async () => {
-  try {
-    await api('POST', '/undo', {});
-    location.reload();
-  } catch (e) {
-    console.error(e);
-    showError(e.message || 'Undo failed');
-  }
-};
-
-publicRedoBtn.onclick = async () => {
-  try {
-    await api('POST', '/redo', {});
-    location.reload();
-  } catch (e) {
-    console.error(e);
-    showError(e.message || 'Redo failed');
-  }
-};
-
 clearBtn.onclick = async () => {
   try {
     if (!clearConfirmArmed) {
@@ -1051,8 +946,6 @@ fsZone.addEventListener('click', () => {
 
 (async function init() {
   try {
-    seedModelLabelFromStorage();
-
     if (rawAlias.includes('-admin-')) {
       await loadAdmin();
     } else {
