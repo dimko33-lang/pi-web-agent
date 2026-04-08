@@ -96,54 +96,83 @@ class Agent:
         return model or "Unknown"
 
     def model_options(self) -> List[Dict]:
+        """Возвращает ВСЕ модели из списка, без проверки через API."""
         models = []
+        # Все модели Groq из списка (18 штук)
+        groq_order = [
+            "groq/compound",
+            "groq/compound-mini",
+            "qwen-qwq-32b",
+            "llama3-8b-8192",
+            "qwen/qwen3-32b",
+            "llama3-70b-8192",
+            "mistral-saba-24b",
+            "llama-3.1-8b-instant",
+            "llama-3.3-70b-versatile",
+            "moonshotai/kimi-k2-instruct",
+            "deepseek-r1-distill-llama-70b",
+            "moonshotai/kimi-k2-instruct-0905",
+            "meta-llama/llama-4-scout-17b-16e-instruct",
+            "meta-llama/llama-4-maverick-17b-128e-instruct",
+            "gemma2-9b-it",
+            "openai/gpt-oss-20b",
+            "openai/gpt-oss-120b",
+            "openai/gpt-oss-safeguard-20b",
+        ]
+        groq_names = {
+            "groq/compound": "Groq · Compound",
+            "groq/compound-mini": "Groq · Compound Mini",
+            "qwen-qwq-32b": "Groq · Qwen QWQ 32B",
+            "llama3-8b-8192": "Groq · Llama 3 8B",
+            "qwen/qwen3-32b": "Groq · Qwen3 32B",
+            "llama3-70b-8192": "Groq · Llama 3 70B",
+            "mistral-saba-24b": "Groq · Mistral Saba 24B",
+            "llama-3.1-8b-instant": "Groq · Llama 3.1 8B (fast/free)",
+            "llama-3.3-70b-versatile": "Groq · Llama 3.3 70B",
+            "moonshotai/kimi-k2-instruct": "Groq · Kimi K2",
+            "deepseek-r1-distill-llama-70b": "Groq · DeepSeek R1 Llama 70B",
+            "moonshotai/kimi-k2-instruct-0905": "Groq · Kimi K2 0905",
+            "meta-llama/llama-4-scout-17b-16e-instruct": "Groq · Llama 4 Scout 17B",
+            "meta-llama/llama-4-maverick-17b-128e-instruct": "Groq · Llama 4 Maverick 17B",
+            "gemma2-9b-it": "Groq · Gemma 2 9B",
+            "openai/gpt-oss-20b": "Groq · GPT-OSS 20B",
+            "openai/gpt-oss-120b": "Groq · GPT-OSS 120B",
+            "openai/gpt-oss-safeguard-20b": "Groq · GPT-OSS Safe 20B",
+        }
         if self.groq_key:
-            models.extend(self._groq_models())
+            for mid in groq_order:
+                models.append({
+                    "name": groq_names.get(mid, f"Groq · {mid}"),
+                    "provider": "groq",
+                    "model": mid,
+                })
+
+        # OpenRouter модели (без фильтрации)
         if self.openrouter_key:
-            models.extend(self._openrouter_models())
+            or_models = [
+                ("GPT-4o", "openai/gpt-4o"),
+                ("GPT-4.1", "openai/gpt-4.1"),
+                ("GPT-4.1 Mini", "openai/gpt-4.1-mini"),
+                ("Claude Sonnet 4", "anthropic/claude-sonnet-4"),
+                ("DeepSeek Chat", "deepseek/deepseek-chat-v3-0324"),
+                ("DeepSeek R1", "deepseek/deepseek-r1"),
+                ("Qwen3 32B", "qwen/qwen3-32b"),
+            ]
+            for name, mid in or_models:
+                models.append({"name": f"OpenRouter · {name}", "provider": "openrouter", "model": mid})
+
+        # Kimi модели
         if self.kimi_key:
-            models.extend(self._kimi_models())
+            models.extend([
+                {"name": "Kimi · K2.5", "provider": "kimi", "model": "kimi-k2.5"},
+                {"name": "Kimi · K2", "provider": "kimi", "model": "kimi-k2"},
+                {"name": "Kimi · K2 Thinking", "provider": "kimi", "model": "kimi-k2-thinking"},
+                {"name": "Kimi · K2 Thinking Turbo", "provider": "kimi", "model": "kimi-k2-thinking-turbo"},
+            ])
+
         if not models:
             models = [{"name": "Llama 3.1 8B", "provider": "groq", "model": "llama-3.1-8b-instant"}]
         return models
-
-    def _groq_models(self):
-        out = []
-        try:
-            r = requests.get(
-                "https://api.groq.com/openai/v1/models",
-                headers={"Authorization": f"Bearer {self.groq_key}", "Content-Type": "application/json"},
-                timeout=20,
-            )
-            r.raise_for_status()
-            data = r.json()
-            ids = sorted({item["id"] for item in data.get("data", []) if item.get("id")})
-        except Exception:
-            ids = list(self.GROQ_LABELS.keys())
-        for model_id in ids:
-            out.append({"name": self.GROQ_LABELS.get(model_id, model_id), "provider": "groq", "model": model_id})
-        return out
-
-    def _openrouter_models(self):
-        out = []
-        available = set()
-        try:
-            r = requests.get("https://openrouter.ai/api/v1/models", timeout=20)
-            r.raise_for_status()
-            data = r.json()
-            available = {item["id"] for item in data.get("data", []) if item.get("id")}
-        except Exception:
-            available = {mid for _, mid in self.OPENROUTER_FAVORITES}
-        for name, model_id in self.OPENROUTER_FAVORITES:
-            if model_id in available:
-                out.append({"name": name, "provider": "openrouter", "model": model_id})
-        if not out:
-            for name, model_id in self.OPENROUTER_FAVORITES:
-                out.append({"name": name, "provider": "openrouter", "model": model_id})
-        return out
-
-    def _kimi_models(self):
-        return [{"name": name, "provider": "kimi", "model": model_id} for name, model_id in self.KIMI_MODELS]
 
     def ensure_session(self, session_name: str, provider=None, model=None):
         provider = (provider or self.default_provider).strip().lower()
@@ -300,7 +329,6 @@ class Agent:
         if not clean_message:
             return {"success": False, "error": "Пустое сообщение"}
 
-        # Проверяем наличие ключевого слова (не удаляем его!)
         lower_msg = clean_message.lower()
         prefix_lower = COMMAND_PREFIX.lower()
         has_command_keyword = (lower_msg.startswith(prefix_lower + " ") or 
@@ -308,10 +336,8 @@ class Agent:
                                f" {prefix_lower} " in lower_msg or
                                lower_msg.endswith(f" {prefix_lower}"))
 
-        # Сообщение оставляем как есть, ничего не удаляем
         modified_message = clean_message
 
-        # Обработка встроенных команд (undo, clear) — они работают всегда, без имени
         lower = modified_message.lower()
         if lower in {"/undo", "undo", "откати назад", "откатить назад", "верни назад", "верни как было"}:
             return self.undo(session_name)
@@ -372,7 +398,6 @@ class Agent:
         assistant_text = str(data.get("assistant") or "").strip() or "Готово."
         changed = False
 
-        # Команды выполняются только если есть ключевое слово
         if mode == "shell" and has_command_keyword:
             command = data.get("command", "").strip()
             if command:
@@ -393,7 +418,6 @@ class Agent:
             css = data.get("css", "").strip()
             if css:
                 new_html = self._apply_css_to_html(current_html, css)
-                # Проверка на сохранение кнопок
                 if not self._check_html_integrity(new_html):
                     error_msg = "Попытка сохранить HTML без кнопок undo/redo. Отказано."
                     add_message(session["id"], "assistant", error_msg, provider, model)
@@ -496,146 +520,11 @@ if not getattr(Agent.chat, "__name__", "") == "_agent_chat_with_global_model":
         return _AGENT_CHAT_ORIG(self, session_name, message, provider=provider, model=model)
     Agent.chat = _agent_chat_with_global_model
 
-# CURATED_MODEL_OPTIONS
+# Для совместимости
 def _cmo_dedupe(items):
-    out = []
-    seen = set()
-    for x in items:
-        key = (x.get("provider"), x.get("model"))
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(x)
-    return out
-
-def _cmo_or_label(item):
-    mid = str(item.get("id") or "").strip()
-    name = str(item.get("name") or "").strip() or mid
-    if ":free" in mid and "free" not in name.lower():
-        name = f"{name} · free"
-    return f"OpenRouter · {name}"
+    return items
 
 def _cmo_model_options(self):
-    items = []
-    groq_order = [
-        "qwen-qwq-32b",
-        "llama3-8b-8192",
-        "qwen/qwen3-32b",
-        "llama3-70b-8192",
-        "mistral-saba-24b",
-        "llama-3.1-8b-instant",
-        "llama-3.3-70b-versatile",
-        "moonshotai/kimi-k2-instruct",
-        "deepseek-r1-distill-llama-70b",
-        "moonshotai/kimi-k2-instruct-0905",
-        "meta-llama/llama-4-scout-17b-16e-instruct",
-        "meta-llama/llama-4-maverick-17b-128e-instruct",
-        "gemma2-9b-it",
-        "openai/gpt-oss-20b",
-        "openai/gpt-oss-120b",
-    ]
-    groq_names = {
-        "qwen-qwq-32b": "Groq · Qwen QWQ 32B",
-        "llama3-8b-8192": "Groq · Llama 3 8B",
-        "qwen/qwen3-32b": "Groq · Qwen3 32B",
-        "llama3-70b-8192": "Groq · Llama 3 70B",
-        "mistral-saba-24b": "Groq · Mistral Saba 24B",
-        "llama-3.1-8b-instant": "Groq · Llama 3.1 8B (fast/free)",
-        "llama-3.3-70b-versatile": "Groq · Llama 3.3 70B",
-        "moonshotai/kimi-k2-instruct": "Groq · Kimi K2",
-        "deepseek-r1-distill-llama-70b": "Groq · DeepSeek R1 Llama 70B",
-        "moonshotai/kimi-k2-instruct-0905": "Groq · Kimi K2 0905",
-        "meta-llama/llama-4-scout-17b-16e-instruct": "Groq · Llama 4 Scout 17B",
-        "meta-llama/llama-4-maverick-17b-128e-instruct": "Groq · Llama 4 Maverick 17B",
-        "gemma2-9b-it": "Groq · Gemma 2 9B",
-        "openai/gpt-oss-20b": "Groq · GPT-OSS 20B",
-        "openai/gpt-oss-120b": "Groq · GPT-OSS 120B",
-    }
-
-    if self.groq_key:
-        available = set()
-        try:
-            r = requests.get(
-                "https://api.groq.com/openai/v1/models",
-                headers={"Authorization": f"Bearer {self.groq_key}", "Content-Type": "application/json"},
-                timeout=20,
-            )
-            r.raise_for_status()
-            available = {m["id"] for m in r.json().get("data", []) if m.get("id")}
-        except Exception:
-            available = set(groq_order)
-
-        for mid in groq_order:
-            if mid in available:
-                items.append({
-                    "name": groq_names.get(mid, f"Groq · {mid}"),
-                    "provider": "groq",
-                    "model": mid,
-                })
-
-    if self.openrouter_key:
-        or_items = []
-        try:
-            r = requests.get("https://openrouter.ai/api/v1/models", timeout=20)
-            r.raise_for_status()
-            or_items = r.json().get("data", [])
-        except Exception:
-            or_items = []
-
-        favorites = [
-            "openai/gpt-4o",
-            "openai/gpt-4.1-mini",
-            "openai/gpt-4.1",
-            "anthropic/claude-sonnet-4",
-            "deepseek/deepseek-chat-v3-0324",
-            "deepseek/deepseek-r1",
-            "qwen/qwen3-32b",
-        ]
-
-        by_id = {str(x.get("id") or "").strip(): x for x in or_items if x.get("id")}
-
-        for mid in favorites:
-            if mid in by_id:
-                items.append({
-                    "name": _cmo_or_label(by_id[mid]),
-                    "provider": "openrouter",
-                    "model": mid,
-                })
-
-        free_prefixes = (
-            "openai/", "deepseek/", "qwen/", "meta-llama/", "mistralai/",
-            "google/", "anthropic/", "moonshotai/"
-        )
-
-        free_added = 0
-        for item in or_items:
-            mid = str(item.get("id") or "").strip()
-            if not mid or ":free" not in mid:
-                continue
-            if not mid.startswith(free_prefixes):
-                continue
-            items.append({
-                "name": _cmo_or_label(item),
-                "provider": "openrouter",
-                "model": mid,
-            })
-            free_added += 1
-            if free_added >= 20:
-                break
-
-    if self.kimi_key:
-        items.extend([
-            {"name": "Kimi · K2.5", "provider": "kimi", "model": "kimi-k2.5"},
-            {"name": "Kimi · K2", "provider": "kimi", "model": "kimi-k2"},
-            {"name": "Kimi · K2 Thinking", "provider": "kimi", "model": "kimi-k2-thinking"},
-            {"name": "Kimi · K2 Thinking Turbo", "provider": "kimi", "model": "kimi-k2-thinking-turbo"},
-        ])
-
-    if not items:
-        items = [
-            {"name": "Groq · Llama 3.1 8B (fast/free)", "provider": "groq", "model": "llama-3.1-8b-instant"},
-        ]
-
-    return _cmo_dedupe(items)
+    return self.model_options()
 
 Agent.model_options = _cmo_model_options
