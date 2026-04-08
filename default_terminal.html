@@ -425,4 +425,566 @@ body{
   <div id="adminControls">
     <select id="sessionSelect"></select>
     <button id="undoBtn" type="button">undo</button>
-    <button id="redoBtn" type="button">redo</
+    <button id="redoBtn" type="button">redo</button>
+    <button id="clearBtn" type="button">clear</button>
+    <button id="refreshBtn" type="button">refresh</button>
+  </div>
+  <div id="modelDock">
+    <div id="modelCurrent">Loading...</div>
+    <div id="modelDropdown"></div>
+  </div>
+</div>
+
+<div id="fullscreenZone"><span>FULL</span></div>
+
+<script>
+const rawAlias = location.search.length > 1 ? decodeURIComponent(location.search.slice(1)) : '';
+const ADMIN_HEADER = rawAlias;
+
+const chatDiv = document.getElementById('chatMessages');
+const input = document.getElementById('messageInput');
+const sendLabel = document.getElementById('sendLabel');
+const pathDisplay = document.getElementById('pathDisplay');
+const fsZone = document.getElementById('fullscreenZone');
+
+const adminControls = document.getElementById('adminControls');
+const sessionSelect = document.getElementById('sessionSelect');
+const undoBtn = document.getElementById('undoBtn');
+const redoBtn = document.getElementById('redoBtn');
+const clearBtn = document.getElementById('clearBtn');
+const refreshBtn = document.getElementById('refreshBtn');
+
+const modelCurrent = document.getElementById('modelCurrent');
+const modelDropdown = document.getElementById('modelDropdown');
+
+let adminMode = false;
+let currentSession = 'default';
+let currentModel = {
+  provider: 'groq',
+  model: 'llama-3.1-8b-instant',
+  label: 'Groq · Llama 3.1 8B (fast/free)'
+};
+let models = [];
+let poller = null;
+let isSending = false;
+
+let clearConfirmArmed = false;
+let clearConfirmTimer = null;
+
+function baseModelName(name) {
+  let s = String(name || '').trim();
+
+  if (s.includes('·')) s = s.split('·').pop().trim();
+  if (s.includes('/')) s = s.split('/').pop().trim();
+
+  s = s
+    .replace(/^openrouter\s*[:·-]?\s*/i, '')
+    .replace(/^open router\s*[:·-]?\s*/i, '')
+    .replace(/^groq\s*[:·-]?\s*/i, '')
+    .replace(/^meta[- ]llama\s*[:·-]?\s*/i, '')
+    .replace(/^meta\s*[:·-]?\s*/i, '')
+    .replace(/^openai\s*[:·-]?\s*/i, '')
+    .replace(/^google\s*[:·-]?\s*/i, '')
+    .replace(/^anthropic\s*[:·-]?\s*/i, '')
+    .replace(/^moonshotai\s*[:·-]?\s*/i, '')
+    .replace(/^moonshot\s*[:·-]?\s*/i, '')
+    .trim();
+
+  return s;
+}
+
+function humanModelName(name) {
+  let s = baseModelName(name);
+
+  const directMap = [
+    [/^llama[- ]?3\.1[- ]?8b[- ]?instant$/i, 'llama 3.1 8B'],
+    [/^llama[- ]?3\.1[- ]?70b[- ]?versatile$/i, 'llama 3.1 70B'],
+    [/^llama[- ]?3\.3[- ]?70b[- ]?versatile$/i, 'llama 3.3 70B'],
+    [/^gpt[- ]?4o[- ]?mini$/i, 'GPT-4o mini'],
+    [/^gpt[- ]?4\.?1[- ]?mini$/i, 'GPT-4.1 mini'],
+    [/^gpt[- ]?4\.?1$/i, 'GPT-4.1'],
+    [/^kimi[- ]?k2$/i, 'Kimi K2'],
+    [/^gemini[- ]?2\.0[- ]?flash(?:[- ]?exp)?$/i, 'Gemini 2.0 Flash'],
+    [/^deepseek[- ]?chat(?:[- ]?v?\d+(?:[- ]?\d+)*)?$/i, 'DeepSeek Chat'],
+    [/^deepseek[- ]?r1(?:[- ]?distill)?$/i, 'DeepSeek R1'],
+    [/^claude[- ]?3\.7[- ]?sonnet$/i, 'Claude 3.7 Sonnet'],
+    [/^claude[- ]?3\.5[- ]?sonnet$/i, 'Claude 3.5 Sonnet'],
+    [/^qwen[- ]?2\.5[- ]?72b(?:[- ]?instruct)?$/i, 'Qwen 2.5 72B'],
+    [/^qwen[- ]?2\.5[- ]?32b(?:[- ]?instruct)?$/i, 'Qwen 2.5 32B'],
+    [/^qwen[- ]?2\.5[- ]?14b(?:[- ]?instruct)?$/i, 'Qwen 2.5 14B'],
+    [/^mistral[- ]?small(?:[- ]?\d+(?:\.\d+)?)?$/i, 'Mistral Small']
+  ];
+
+  for (const [rx, out] of directMap) {
+    if (rx.test(s)) return out;
+  }
+
+  s = s
+    .replace(/[_]+/g, '-')
+    .replace(/\binstant\b/ig, '')
+    .replace(/\binstruct\b/ig, '')
+    .replace(/\bversatile\b/ig, '')
+    .replace(/\bpreview\b/ig, '')
+    .replace(/\blatest\b/ig, '')
+    .replace(/\bonline\b/ig, '')
+    .replace(/\bfree\b/ig, '')
+    .replace(/\s+/g, ' ')
+    .replace(/-+/g, ' ')
+    .trim();
+
+  if (!s) return 'model';
+
+  const tokens = s.split(' ').map(t => {
+    const low = t.toLowerCase();
+    if (low === 'gpt') return 'GPT';
+    if (low === 'claude') return 'Claude';
+    if (low === 'gemini') return 'Gemini';
+    if (low === 'kimi') return 'Kimi';
+    if (low === 'qwen') return 'Qwen';
+    if (low === 'deepseek') return 'DeepSeek';
+    if (low === 'mistral') return 'Mistral';
+    if (low === 'grok') return 'Grok';
+    if (low === 'llama') return 'llama';
+    return t;
+  });
+
+  return tokens.join(' ');
+}
+
+function compactModelName(name, maxLen = 18) {
+  let s = humanModelName(name);
+
+  if (s.length <= maxLen) return s;
+
+  s = s
+    .replace(/\bChat\b/ig, '')
+    .replace(/\bSonnet\b/ig, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (s.length <= maxLen) return s;
+
+  return s.slice(0, maxLen - 1).trimEnd() + '…';
+}
+
+function providerShort(provider) {
+  const p = String(provider || '').trim().toLowerCase();
+  if (p === 'openrouter') return 'OR';
+  if (p === 'groq') return 'GROQ';
+  return String(provider || '').trim();
+}
+
+function currentModelLabel(provider, name) {
+  return compactModelName(name, 18);
+}
+
+function dropdownModelLabel(provider, name) {
+  let fullName = humanModelName(name);
+  let shortProvider = providerShort(provider);
+  let isFree = name && name.toLowerCase().includes('free');
+  if (isFree) {
+    return `FREE · ${shortProvider}: ${fullName}`;
+  }
+  return `${shortProvider}: ${fullName}`;
+}
+
+function setThinking(v) {
+  sendLabel.classList.toggle('thinking', !!v);
+  sendLabel.textContent = v ? '...' : 'Send';
+}
+
+function api(method, url, data=null, admin=false) {
+  const headers = {'Content-Type': 'application/json'};
+  if (admin) headers['X-Admin-Alias'] = ADMIN_HEADER;
+
+  return fetch(url, {
+    method,
+    headers,
+    body: data ? JSON.stringify(data) : null
+  }).then(async (res) => {
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(payload.error || ('HTTP ' + res.status));
+    return payload;
+  });
+}
+
+function autoResize() {
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+}
+
+function armClearButton() {
+  clearConfirmArmed = true;
+  clearBtn.textContent = 'sure?';
+  clearBtn.style.background = 'rgba(255,120,120,0.16)';
+  clearBtn.style.borderColor = 'rgba(255,160,160,0.34)';
+
+  if (clearConfirmTimer) clearTimeout(clearConfirmTimer);
+  clearConfirmTimer = setTimeout(() => {
+    disarmClearButton();
+  }, 900);
+}
+
+function disarmClearButton() {
+  clearConfirmArmed = false;
+  clearBtn.textContent = 'clear';
+  clearBtn.style.background = '';
+  clearBtn.style.borderColor = '';
+
+  if (clearConfirmTimer) {
+    clearTimeout(clearConfirmTimer);
+    clearConfirmTimer = null;
+  }
+}
+
+function renderHistory(items) {
+  chatDiv.innerHTML = '';
+  if (!items || !items.length) return;
+
+  for (const item of items) {
+    const wrap = document.createElement('div');
+    wrap.className = 'msgWrap' + (adminMode ? ' adminDeletable' : '');
+    if (item.id) wrap.dataset.id = item.id;
+
+    const msg = document.createElement('div');
+    const isUser = item.role === 'user';
+    msg.className = 'msg ' + (isUser ? 'user' : 'assistant');
+    msg.textContent = item.message || item.content || '';
+    wrap.appendChild(msg);
+
+    if (adminMode && item.id) {
+      wrap.title = 'Double click to delete';
+      wrap.ondblclick = async () => {
+        try {
+          await api('POST', '/admin/delete_message', {id: item.id}, true);
+          await loadHistory();
+        } catch (e) {
+          console.error(e);
+        }
+      };
+    }
+
+    chatDiv.appendChild(wrap);
+  }
+
+  chatDiv.scrollTop = chatDiv.scrollHeight;
+}
+
+function renderModelDock() {
+  const rawName = currentModel.model || currentModel.label || '';
+  modelCurrent.textContent = currentModelLabel(currentModel.provider, rawName);
+  modelCurrent.title = humanModelName(rawName);
+  modelDropdown.innerHTML = '';
+
+  if (!adminMode) {
+    modelCurrent.classList.remove('admin-clickable');
+    modelDropdown.style.display = 'none';
+    return;
+  }
+
+  modelCurrent.classList.add('admin-clickable');
+
+  const sorted = [...models].sort((a, b) => {
+    const order = { groq: 1, openrouter: 2 };
+    const pa = a.provider.toLowerCase();
+    const pb = b.provider.toLowerCase();
+    if (order[pa] && order[pb]) return order[pa] - order[pb];
+    if (order[pa]) return -1;
+    if (order[pb]) return 1;
+    return pa.localeCompare(pb);
+  });
+
+  for (const m of sorted) {
+    const isActive = m.provider === currentModel.provider && m.model === currentModel.model;
+    const el = document.createElement('div');
+    el.className = 'model-option' + (isActive ? ' active' : '');
+    el.textContent = dropdownModelLabel(m.provider, m.model || m.name || '');
+    el.title = m.model || m.name || '';
+    el.style.whiteSpace = 'normal';
+    el.style.wordBreak = 'break-word';
+
+    el.onclick = async (e) => {
+      e.stopPropagation();
+      try {
+        const data = await api('POST', '/admin/set_model', {
+          provider: m.provider,
+          model: m.model
+        }, true);
+
+        currentModel = {
+          provider: data.provider,
+          model: data.model,
+          label: data.label || dropdownModelLabel(data.provider, data.model)
+        };
+        renderModelDock();
+        modelDropdown.style.display = 'none';
+      } catch (e2) {
+        console.error(e2);
+      }
+    };
+
+    modelDropdown.appendChild(el);
+  }
+}
+
+async function syncGlobalModel() {
+  try {
+    const gm = await api('GET', '/global_model');
+    currentModel = {
+      provider: gm.provider,
+      model: gm.model,
+      label: gm.label || (gm.provider + ' / ' + gm.model)
+    };
+    renderModelDock();
+  } catch (_) {}
+}
+
+async function loadModels() {
+  try {
+    const data = await api('GET', '/models');
+    models = data.models || [];
+  } catch (_) {
+    models = [];
+  }
+}
+
+async function loadSessionStyles(sessionName) {
+  // Загружаем HTML сессии и применяем его стили
+  try {
+    const data = await api('GET', `/session_html?session=${sessionName}`);
+    if (data.success && data.html) {
+      // Извлекаем блок <style id="agent-style"> из полученного HTML
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(data.html, 'text/html');
+      const newStyle = doc.querySelector('style#agent-style');
+      if (newStyle) {
+        // Заменяем или добавляем стиль на текущей странице
+        let oldStyle = document.querySelector('style#agent-style');
+        if (oldStyle) {
+          oldStyle.textContent = newStyle.textContent;
+        } else {
+          document.head.appendChild(newStyle.cloneNode(true));
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load session styles:', e);
+  }
+}
+
+async function loadPublic() {
+  adminMode = false;
+  adminControls.style.display = 'none';
+  pathDisplay.textContent = '~/projects/pi-ru';
+  await syncGlobalModel();
+  await loadHistory();
+}
+
+async function loadAdmin() {
+  adminMode = true;
+  adminControls.style.display = 'flex';
+  pathDisplay.textContent = '~/projects/pi-ru';
+
+  const state = await api('GET', '/admin/state', null, true);
+  await loadModels();
+
+  currentModel = state.global_model || currentModel;
+  currentSession = localStorage.getItem('pi_admin_target_session') || 'private';
+  if (!state.sessions.includes(currentSession)) {
+    currentSession = state.sessions.includes('private') ? 'private' : (state.sessions[0] || 'default');
+  }
+
+  sessionSelect.innerHTML = '';
+  for (const s of state.sessions) {
+    const opt = document.createElement('option');
+    opt.value = s;
+    opt.textContent = s;
+    if (s === currentSession) opt.selected = true;
+    sessionSelect.appendChild(opt);
+  }
+
+  renderModelDock();
+  await loadHistory();
+  // Загружаем стили для текущей сессии
+  await loadSessionStyles(currentSession);
+}
+
+async function loadHistory() {
+  if (adminMode) {
+    const data = await api('POST', '/admin/history', {session: currentSession}, true);
+    renderHistory(data.history || []);
+  } else {
+    const data = await api('POST', '/history', {});
+    renderHistory(data.history || []);
+  }
+}
+
+function showError(msg) {
+  const wrap = document.createElement('div');
+  wrap.className = 'msgWrap';
+  const msgDiv = document.createElement('div');
+  msgDiv.className = 'msg assistant';
+  msgDiv.style.color = '#ff8a8a';
+  msgDiv.style.whiteSpace = 'pre-wrap';
+  msgDiv.textContent = 'Ошибка: ' + msg;
+  wrap.appendChild(msgDiv);
+  chatDiv.appendChild(wrap);
+  chatDiv.scrollTop = chatDiv.scrollHeight;
+}
+
+async function sendMessage() {
+  const text = input.value.trim();
+  if (!text || isSending) return;
+
+  isSending = true;
+  input.value = '';
+  autoResize();
+  setThinking(true);
+  sendLabel.style.pointerEvents = 'none';
+
+  try {
+    if (adminMode) {
+      const data = await api('POST', '/admin/chat', {
+        session: currentSession,
+        message: text
+      }, true);
+
+      await loadHistory();
+      await syncGlobalModel();
+
+      if (data.changed) {
+        // После изменения дизайна обновляем стили
+        await loadSessionStyles(currentSession);
+      }
+    } else {
+      const data = await api('POST', '/chat', { message: text });
+      await loadHistory();
+      await syncGlobalModel();
+      if (data.changed) setTimeout(() => location.reload(), 250);
+    }
+  } catch (e) {
+    console.error(e);
+    showError(e.message);
+  } finally {
+    isSending = false;
+    sendLabel.style.pointerEvents = '';
+    setThinking(false);
+  }
+}
+
+function startPolling() {
+  if (poller) clearInterval(poller);
+  poller = setInterval(async () => {
+    try {
+      await loadHistory();
+      await syncGlobalModel();
+    } catch (_) {}
+  }, 2500);
+}
+
+sendLabel.onclick = sendMessage;
+
+input.addEventListener('input', autoResize);
+input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+sessionSelect.addEventListener('change', async () => {
+  currentSession = sessionSelect.value;
+  localStorage.setItem('pi_admin_target_session', currentSession);
+  disarmClearButton();
+  await loadHistory();
+  // Загружаем стили выбранной сессии без перезагрузки страницы
+  await loadSessionStyles(currentSession);
+});
+
+undoBtn.onclick = async () => {
+  try {
+    disarmClearButton();
+    await api('POST', '/admin/undo', {session: currentSession}, true);
+    await loadHistory();
+    // Обновляем стили после undo (мог измениться HTML)
+    await loadSessionStyles(currentSession);
+  } catch (e) {
+    console.error(e);
+    showError(e.message || 'Undo failed');
+  }
+};
+
+redoBtn.onclick = async () => {
+  try {
+    disarmClearButton();
+    await api('POST', '/admin/redo', {session: currentSession}, true);
+    await loadHistory();
+    await loadSessionStyles(currentSession);
+  } catch (e) {
+    console.error(e);
+    showError(e.message || 'Redo failed');
+  }
+};
+
+clearBtn.onclick = async () => {
+  try {
+    if (!clearConfirmArmed) {
+      armClearButton();
+      return;
+    }
+
+    disarmClearButton();
+    await api('POST', '/admin/clear_session', {session: currentSession}, true);
+    await loadHistory();
+  } catch (e) {
+    console.error(e);
+    showError(e.message || 'Clear failed');
+  }
+};
+
+refreshBtn.onclick = () => {
+  disarmClearButton();
+  location.reload();
+};
+
+modelCurrent.onclick = (e) => {
+  e.stopPropagation();
+  if (!adminMode) return;
+  const willOpen = modelDropdown.style.display !== 'block';
+  if (willOpen) {
+    modelDropdown.style.display = 'block';
+    modelDropdown.scrollTop = 0;
+  } else {
+    modelDropdown.style.display = 'none';
+  }
+};
+
+document.addEventListener('click', () => {
+  modelDropdown.style.display = 'none';
+});
+
+fsZone.addEventListener('click', () => {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+  else document.exitFullscreen();
+});
+
+(async function init() {
+  try {
+    if (rawAlias.includes('-admin-')) {
+      await loadAdmin();
+    } else {
+      await loadPublic();
+    }
+
+    startPolling();
+    autoResize();
+    input.focus();
+  } catch (e) {
+    console.error(e);
+    chatDiv.innerHTML = '';
+    showError('Ошибка запуска интерфейса: ' + (e.message || 'Неизвестная ошибка'));
+  }
+})();
+</script>
+</body>
+</html>
