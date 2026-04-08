@@ -96,7 +96,7 @@ class Agent:
         return model or "Unknown"
 
     def model_options(self) -> List[Dict]:
-        """Порядок: GROQ → Kimi → OpenRouter"""
+        """Возвращает список моделей: GROQ → Kimi → OpenRouter (с сортировкой: auto, free, бесплатные, остальные)."""
         models = []
 
         # 1. GROQ
@@ -135,18 +135,16 @@ class Agent:
                     mid = item.get("id")
                     if not mid:
                         continue
-                    raw_name = item.get("name") or mid
-                    clean_name = re.sub(r'^OR:\s*', '', raw_name)
+                    name = item.get("name") or mid
                     is_free = ":free" in mid
                     if mid == "openrouter/auto":
                         display_name = "OpenRouter · auto (automatic)"
                     elif mid == "openrouter/free":
                         display_name = "OpenRouter · free (automatic free tier)"
                     else:
+                        display_name = f"OpenRouter · {name}"
                         if is_free:
-                            display_name = f"FREE · OpenRouter · {clean_name}"
-                        else:
-                            display_name = f"OpenRouter · {clean_name}"
+                            display_name += " · free"
                     or_models.append({
                         "name": display_name,
                         "provider": "openrouter",
@@ -154,6 +152,7 @@ class Agent:
                         "_is_free": is_free,
                         "_id": mid
                     })
+                # Сортировка: сначала auto, потом free, потом бесплатные, потом остальные
                 def sort_key(m):
                     mid = m["_id"]
                     if mid == "openrouter/auto":
@@ -161,13 +160,14 @@ class Agent:
                     if mid == "openrouter/free":
                         return (1, "")
                     if m["_is_free"]:
-                        return (2, m["name"])
-                    return (3, m["name"])
+                        return (2, mid)
+                    return (3, mid)
                 or_models.sort(key=sort_key)
                 for m in or_models:
                     models.append({"name": m["name"], "provider": m["provider"], "model": m["model"]})
             except Exception as e:
                 print(f"OpenRouter API error: {e}")
+                # fallback
                 models.append({"name": "OpenRouter · auto (automatic)", "provider": "openrouter", "model": "openrouter/auto"})
                 models.append({"name": "OpenRouter · free (automatic free tier)", "provider": "openrouter", "model": "openrouter/free"})
                 for name, mid in self.OPENROUTER_FAVORITES:
@@ -248,15 +248,14 @@ class Agent:
             return {"output": str(e), "exit_code": -1}
 
     def _apply_css_to_html(self, html: str, css: str) -> str:
-        """Вставляет CSS агента в конец head, удаляя предыдущий блок."""
         style_tag = f'<style id="agent-style">\n{css}\n</style>'
-        # Удаляем предыдущий блок с id="agent-style", если был
-        html = re.sub(r'<style\s+id="agent-style">.*?</style>', '', html, flags=re.DOTALL)
-        # Вставляем новый блок перед закрывающим </head>
-        if '</head>' in html:
-            new_html = html.replace('</head>', f'{style_tag}\n</head>')
+        if '<style id="agent-style">' in html:
+            new_html = re.sub(r'<style id="agent-style">.*?</style>', style_tag, html, flags=re.DOTALL)
         else:
-            new_html = html + style_tag
+            if '</head>' in html:
+                new_html = html.replace('</head>', f'{style_tag}\n</head>')
+            else:
+                new_html = html + style_tag
         return new_html
 
     def _extract_json(self, text: str) -> dict:
