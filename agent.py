@@ -96,7 +96,7 @@ class Agent:
         return model or "Unknown"
 
     def model_options(self) -> List[Dict]:
-        """Возвращает список моделей: GROQ, Kimi, OpenRouter (сортировка: auto, free, бесплатные, остальные)."""
+        """Возвращает список моделей: GROQ → Kimi → OpenRouter (с сортировкой: auto, free, бесплатные, остальные)."""
         models = []
 
         # 1. GROQ
@@ -165,7 +165,8 @@ class Agent:
                 or_models.sort(key=sort_key)
                 for m in or_models:
                     models.append({"name": m["name"], "provider": m["provider"], "model": m["model"]})
-            except Exception:
+            except Exception as e:
+                print(f"OpenRouter API error: {e}")
                 # fallback
                 models.append({"name": "OpenRouter · auto (automatic)", "provider": "openrouter", "model": "openrouter/auto"})
                 models.append({"name": "OpenRouter · free (automatic free tier)", "provider": "openrouter", "model": "openrouter/free"})
