@@ -92,7 +92,6 @@ class Agent:
         return model or "Unknown"
 
     def model_options(self) -> List[Dict]:
-        """Порядок: GROQ → Kimi → OpenRouter"""
         models = []
         if self.groq_key:
             try:
@@ -123,14 +122,9 @@ class Agent:
                     raw_name = item.get("name") or mid
                     clean_name = re.sub(r'^OR:\s*', '', raw_name)
                     is_free = ":free" in mid
-                    if mid == "openrouter/auto":
-                        display_name = "OpenRouter · auto (automatic)"
-                    elif mid == "openrouter/free":
-                        display_name = "OpenRouter · free (automatic free tier)"
-                    else:
-                        display_name = f"{'FREE · ' if is_free else ''}OpenRouter · {clean_name}"
+                    display_name = f"{'FREE · ' if is_free else ''}OpenRouter · {clean_name}"
                     or_models.append({"name": display_name, "provider": "openrouter", "model": mid, "_is_free": is_free, "_id": mid})
-                def sort_key(m): 
+                def sort_key(m):
                     mid = m["_id"]
                     if mid == "openrouter/auto": return (0, "")
                     if mid == "openrouter/free": return (1, "")
@@ -210,27 +204,26 @@ class Agent:
 - Если пользователь не называет тебя "{COMMAND_PREFIX}", просто болтай.
 - Если обратился "{COMMAND_PREFIX}, ...", выполняй команды.
 
-Новые возможности (сейчас есть):
+Новые возможности:
 - shell-команды
 - изменение CSS
 - изменение полного HTML
-- **browse_page** — полноценный браузер (можешь зайти по любой ссылке, подождать JS, прочитать текст страницы)
+- browse_page — зайти по любой ссылке и прочитать страницу
 
 Формат ответа — ТОЛЬКО JSON:
 {{
   "mode": "chat" / "shell" / "edit_css" / "edit_full" / "browse",
   "assistant": "твой ответ пользователю",
-  "command": "команда для shell (если mode=shell)",
-  "css": "CSS код (если mode=edit_css)",
-  "html": "полный HTML (если mode=edit_full)",
-  "url": "ссылка, по которой нужно зайти (если mode=browse)"
+  "command": "команда для shell",
+  "css": "CSS код",
+  "html": "полный HTML",
+  "url": "ссылка для browse"
 }}
-Когда пользователь просит посмотреть репозиторий, GitHub, конфиг и т.д. — используй mode: "browse" и передай url.
+Когда просят посмотреть репозиторий или GitHub — используй mode: "browse".
 Будь собой — открытым и приятным.
 """.strip()
 
     def _call_provider(self, provider: str, model: str, messages: list) -> str:
-        # (код без изменений, оставил как был)
         provider = (provider or "").strip().lower()
         if provider == "groq":
             if not self.groq_key: raise RuntimeError("GROQ_API_KEY не задан")
@@ -255,7 +248,6 @@ class Agent:
         return data["choices"][0]["message"]["content"] or ""
 
     def chat(self, session_name: str, message: str, provider=None, model=None):
-        # ... (все старые части до try: raw_reply = ... оставлены без изменений)
         session_name = (session_name or "default").strip() or "default"
         clean_message = (message or "").strip()
         if not clean_message:
@@ -329,7 +321,6 @@ class Agent:
                 changed = True
                 assistant_text = assistant_text or "HTML обновлён."
 
-        # ←←← НОВЫЙ БЛОК ДЛЯ БРАУЗЕРА
         elif mode == "browse" and has_command_keyword:
             url = str(data.get("url") or "").strip()
             if url:
@@ -339,7 +330,6 @@ class Agent:
                 return {"success": True, "reply": assistant_text, "changed": False, "provider": provider, "model": model, "label": self.label_for(provider, model)}
             else:
                 assistant_text = "Не указана ссылка для просмотра."
-        # ←←←
 
         add_message(session["id"], "assistant", assistant_text, provider, model)
         return {"success": True, "reply": assistant_text, "changed": changed, "provider": provider, "model": model, "label": self.label_for(provider, model)}
@@ -362,26 +352,32 @@ class Agent:
             if elem_id not in html: return False
         return True
 
-    def browse_page(self, url: str, timeout: int = 30) -> str:
-        """Полноценный браузер: заходит по любой ссылке, ждёт JS и возвращает текст страницы"""
+    # ЛЁГКИЕ НОЖКИ (без Playwright)
+    def browse_page(self, url: str) -> str:
+        """Простой браузер: заходит по ссылке и возвращает чистый текст страницы"""
         try:
-            from playwright.sync_api import sync_playwright
-            with sync_playwright() as p:
-                browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'])
-                page = browser.new_page()
-                page.set_default_timeout(timeout * 1000)
-                response = page.goto(url, wait_until="networkidle", timeout=timeout*1000)
-                if not response or response.status >= 400:
-                    return f"Ошибка: страница {url} не загрузилась (статус {response.status if response else 'None'})"
-                title = page.title()
-                text = page.locator("body").inner_text()
-                browser.close()
-                return f"Заголовок: {title}\n\n{text[:20000]}"
+            import requests
+            from bs4 import BeautifulSoup
+            headers = {"User-Agent": "Mozilla/5.0 (compatible; Pi-Agent/1.0)"}
+            r = requests.get(url, headers=headers, timeout=20)
+            r.raise_for_status()
+            
+            soup = BeautifulSoup(r.text, "lxml")
+            for tag in soup(["script", "style", "nav", "header", "footer"]):
+                tag.decompose()
+            
+            text = soup.get_text(separator="\n")
+            lines = (line.strip() for line in text.splitlines())
+            clean_text = "\n".join(line for line in lines if line)
+            
+            title = soup.title.string.strip() if soup.title else "Без заголовка"
+            return f"Заголовок: {title}\n\n{clean_text[:20000]}"
         except Exception as e:
-            return f"Ошибка браузера: {str(e)}"
+            return f"Ошибка: {str(e)}"
 
 
 agent = Agent()
+
 
 # GLOBAL_MODEL_OVERRIDE
 import json as _gmo_json
