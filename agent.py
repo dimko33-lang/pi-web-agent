@@ -276,21 +276,25 @@ class Agent:
             return json.loads(raw[start:end+1])
         raise ValueError("Модель вернула невалидный JSON")
 
+    # ---------- УЛУЧШЕННЫЙ СИСТЕМНЫЙ ПРОМПТ ----------
     def _system_prompt(self) -> str:
         return f"""
 Ты — дружелюбный помощник по имени {COMMAND_PREFIX}. Общайся естественно, живо, по-русски. Отвечай как живой человек, можешь шутить, размышлять, выражать эмоции.
 
-Важные правила:
-- Ты можешь выполнять shell-команды и изменять CSS по любой просьбе пользователя, без специального обращения.
-- Никогда не удаляй кнопки управления (undo, redo, clear, refresh, выбор сессии, блок модели).
+ВАЖНО: ты работаешь в двух режимах.
+1. ОБЫЧНЫЙ РАЗГОВОР — если пользователь НЕ обратился к тебе по имени "{COMMAND_PREFIX}". Ты просто отвечаешь как собеседник, не выполняешь никаких действий на сервере и не меняешь CSS. Формат ответа: {{ "mode": "chat", "assistant": "твой ответ" }}
+2. РЕЖИМ КОМАНД — если пользователь ЯВНО обратился "{COMMAND_PREFIX}" (например, "{COMMAND_PREFIX}, измени фон на чёрный"). В этом режиме ты можешь выполнить shell-команду или изменить CSS. Если команда не требуется, можно ответить и в режиме chat.
 
-Формат ответа — ТОЛЬКО JSON, без пояснений:
-- Обычный разговор: {{ "mode": "chat", "assistant": "твой ответ" }}
-- Команда shell: {{ "mode": "shell", "assistant": "пояснение", "command": "команда" }}
+Запрещено удалять или скрывать кнопки управления (undo, redo, clear, refresh, выбор сессии, блок модели).
+
+Формат ответа — ТОЛЬКО JSON, без пояснений вне JSON:
+- Разговор: {{ "mode": "chat", "assistant": "твой ответ" }}
+- Shell-команда: {{ "mode": "shell", "assistant": "пояснение", "command": "команда" }}
 - Изменение CSS: {{ "mode": "edit_css", "assistant": "пояснение", "css": "body {{ background: black; }}" }}
 
 Будь собой — открытым и приятным.
 """.strip()
+    # ------------------------------------------------
 
     def _call_provider(self, provider: str, model: str, messages: list) -> str:
         provider = (provider or "").strip().lower()
@@ -333,9 +337,14 @@ class Agent:
         if not clean_message:
             return {"success": False, "error": "Пустое сообщение"}
 
-        # ---------- ИЗМЕНЕНО: теперь команды выполняются всегда, без ключевого слова ----------
-        has_command_keyword = True
-        # ------------------------------------------------------------------------------------
+        # ---------- ВОЗВРАЩАЕМ ПРОВЕРКУ НА КЛЮЧЕВОЕ СЛОВО ----------
+        lower_msg = clean_message.lower()
+        prefix_lower = COMMAND_PREFIX.lower()
+        has_command_keyword = (lower_msg.startswith(prefix_lower + " ") or 
+                               lower_msg.startswith(prefix_lower + ",") or
+                               f" {prefix_lower} " in lower_msg or
+                               lower_msg.endswith(f" {prefix_lower}"))
+        # ---------------------------------------------------------
 
         modified_message = clean_message
 
@@ -399,6 +408,7 @@ class Agent:
         assistant_text = str(data.get("assistant") or "").strip() or "Готово."
         changed = False
 
+        # --- ВАЖНО: команды выполняются ТОЛЬКО при наличии ключевого слова ---
         if mode == "shell" and has_command_keyword:
             command = data.get("command", "").strip()
             if command:
