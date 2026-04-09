@@ -208,7 +208,7 @@ class Agent:
 - shell-команды
 - изменение CSS
 - изменение полного HTML
-- browse_page — зайти по любой ссылке и прочитать страницу
+- browse_page — умный браузер (можешь зайти по любой ссылке, читать GitHub, raw-файлы, код и т.д.)
 
 Формат ответа — ТОЛЬКО JSON:
 {{
@@ -219,7 +219,7 @@ class Agent:
   "html": "полный HTML",
   "url": "ссылка для browse"
 }}
-Когда просят посмотреть репозиторий или GitHub — используй mode: "browse".
+Когда просят посмотреть репозиторий, файл или GitHub — используй mode: "browse".
 Будь собой — открытым и приятным.
 """.strip()
 
@@ -352,28 +352,49 @@ class Agent:
             if elem_id not in html: return False
         return True
 
-    # ЛЁГКИЕ НОЖКИ (без Playwright)
+    # ==================== УМНЫЙ БРАУЗЕР ====================
     def browse_page(self, url: str) -> str:
-        """Простой браузер: заходит по ссылке и возвращает чистый текст страницы"""
+        """Умный браузер: чисто читает GitHub, raw-файлы и обычные страницы"""
         try:
             import requests
             from bs4 import BeautifulSoup
+
+            # Автоматически переходим на raw-версию, если это GitHub файл
+            if "github.com" in url and "/blob/" in url:
+                url = url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
+
             headers = {"User-Agent": "Mozilla/5.0 (compatible; Pi-Agent/1.0)"}
             r = requests.get(url, headers=headers, timeout=20)
             r.raise_for_status()
-            
+
+            # Если это raw-файл (код) — возвращаем почти как есть
+            if "raw.githubusercontent.com" in url or url.endswith((".py", ".sh", ".txt", ".md", ".html", ".json", ".yml", ".yaml")):
+                return f"✅ Чистый файл:\n\n{r.text[:25000]}"
+
+            # Обычная страница
             soup = BeautifulSoup(r.text, "lxml")
-            for tag in soup(["script", "style", "nav", "header", "footer"]):
+            for tag in soup(["script", "style", "nav", "header", "footer", "svg"]):
                 tag.decompose()
-            
+
             text = soup.get_text(separator="\n")
             lines = (line.strip() for line in text.splitlines())
             clean_text = "\n".join(line for line in lines if line)
-            
+
             title = soup.title.string.strip() if soup.title else "Без заголовка"
+
+            # Для главной страницы GitHub репо — показываем список файлов
+            if "github.com" in url and "/tree/" not in url and "/blob/" not in url:
+                file_links = soup.select("a[title][href*='/tree/'], a[title][href*='/blob/']")
+                files = [link.get("title") for link in file_links if link.get("title")]
+                if files:
+                    file_list = "\n📁 Файлы в репозитории:\n" + "\n".join(f"• {f}" for f in files[:30])
+                    return f"Заголовок: {title}\n{file_list}\n\n{clean_text[:18000]}"
+
             return f"Заголовок: {title}\n\n{clean_text[:20000]}"
+
         except Exception as e:
             return f"Ошибка: {str(e)}"
+    # =====================================================
 
 
 agent = Agent()
