@@ -260,56 +260,41 @@ class Agent:
         return new_html
 
     def _extract_json(self, text: str) -> dict:
-        """Извлекает JSON из ответа модели. Если не удалось – возвращает словарь с mode='chat' и текстом ответа."""
         raw = (text or "").strip()
         if not raw:
             raise ValueError("Модель вернула пустой ответ")
-        
-        # Попытка 1: прямой парсинг
         try:
             return json.loads(raw)
         except Exception:
             pass
-        
-        # Попытка 2: извлечение из блока кода ```json ... ```
-        fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, re.S | re.I)
+        fenced = re.search(r"```(?:json)?\s*(\{.*\})\s*```", raw, re.S | re.I)
         if fenced:
-            try:
-                return json.loads(fenced.group(1).strip())
-            except Exception:
-                pass
-        
-        # Попытка 3: найти первую { и последнюю }
+            return json.loads(fenced.group(1).strip())
         start = raw.find("{")
         end = raw.rfind("}")
         if start != -1 and end != -1 and end > start:
-            try:
-                return json.loads(raw[start:end+1])
-            except Exception:
-                pass
-        
-        # Если ничего не получилось – возвращаем fallback: весь ответ как chat
-        raise ValueError("Модель вернула невалидный JSON (fallback)")
+            return json.loads(raw[start:end+1])
+        raise ValueError("Модель вернула невалидный JSON")
 
+    # ---------- УЛУЧШЕННЫЙ СИСТЕМНЫЙ ПРОМПТ ----------
     def _system_prompt(self) -> str:
         return f"""
 Ты — дружелюбный помощник по имени {COMMAND_PREFIX}. Общайся естественно, живо, по-русски. Отвечай как живой человек, можешь шутить, размышлять, выражать эмоции.
 
 ВАЖНО: ты работаешь в двух режимах.
-1. ОБЫЧНЫЙ РАЗГОВОР — если пользователь НЕ обратился к тебе по имени "{COMMAND_PREFIX}". Ты просто отвечаешь как собеседник, не выполняешь никаких действий на сервере и не меняешь CSS.
+1. ОБЫЧНЫЙ РАЗГОВОР — если пользователь НЕ обратился к тебе по имени "{COMMAND_PREFIX}". Ты просто отвечаешь как собеседник, не выполняешь никаких действий на сервере и не меняешь CSS. Формат ответа: {{ "mode": "chat", "assistant": "твой ответ" }}
 2. РЕЖИМ КОМАНД — если пользователь ЯВНО обратился "{COMMAND_PREFIX}" (например, "{COMMAND_PREFIX}, измени фон на чёрный"). В этом режиме ты можешь выполнить shell-команду или изменить CSS. Если команда не требуется, можно ответить и в режиме chat.
 
 Запрещено удалять или скрывать кнопки управления (undo, redo, clear, refresh, выбор сессии, блок модели).
 
-!!! КРИТИЧЕСКИ ВАЖНО !!!
-Твой ответ должен быть **ТОЛЬКО** JSON-объектом. Никакого текста до или после фигурных скобок. Только чистая JSON-строка.
-Примеры:
-- Разговор: {{"mode": "chat", "assistant": "Привет! Как дела?"}}
-- Команда: {{"mode": "shell", "assistant": "Выполняю", "command": "ls -la"}}
-- CSS: {{"mode": "edit_css", "assistant": "Меняю фон", "css": "body {{ background: black; }}"}}
+Формат ответа — ТОЛЬКО JSON, без пояснений вне JSON:
+- Разговор: {{ "mode": "chat", "assistant": "твой ответ" }}
+- Shell-команда: {{ "mode": "shell", "assistant": "пояснение", "command": "команда" }}
+- Изменение CSS: {{ "mode": "edit_css", "assistant": "пояснение", "css": "body {{ background: black; }}" }}
 
-Если ты не уверен, что ответил строго по формату – перепроверь. Не добавляй комментарии, пояснения, лишние пробелы вне JSON.
+Будь собой — открытым и приятным.
 """.strip()
+    # ------------------------------------------------
 
     def _call_provider(self, provider: str, model: str, messages: list) -> str:
         provider = (provider or "").strip().lower()
@@ -352,13 +337,14 @@ class Agent:
         if not clean_message:
             return {"success": False, "error": "Пустое сообщение"}
 
-        # Проверка на ключевое слово "Ким"
+        # ---------- ВОЗВРАЩАЕМ ПРОВЕРКУ НА КЛЮЧЕВОЕ СЛОВО ----------
         lower_msg = clean_message.lower()
         prefix_lower = COMMAND_PREFIX.lower()
         has_command_keyword = (lower_msg.startswith(prefix_lower + " ") or 
                                lower_msg.startswith(prefix_lower + ",") or
                                f" {prefix_lower} " in lower_msg or
                                lower_msg.endswith(f" {prefix_lower}"))
+        # ---------------------------------------------------------
 
         modified_message = clean_message
 
@@ -402,14 +388,9 @@ class Agent:
             },
         ]
 
-        # Вызов модели и обработка ответа
         try:
             raw_reply = self._call_provider(provider, model, messages)
-            try:
-                data = self._extract_json(raw_reply)
-            except ValueError:
-                # Если JSON невалидный – превращаем весь ответ в chat-режим
-                data = {"mode": "chat", "assistant": raw_reply.strip()}
+            data = self._extract_json(raw_reply)
         except Exception as e:
             error_text = f"Ошибка обработки ответа модели: {str(e)}"
             add_message(session["id"], "assistant", error_text, provider, model)
@@ -427,7 +408,7 @@ class Agent:
         assistant_text = str(data.get("assistant") or "").strip() or "Готово."
         changed = False
 
-        # Команды выполняются ТОЛЬКО при наличии ключевого слова
+        # --- ВАЖНО: команды выполняются ТОЛЬКО при наличии ключевого слова ---
         if mode == "shell" and has_command_keyword:
             command = data.get("command", "").strip()
             if command:
