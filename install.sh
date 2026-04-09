@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 trap 'echo "ERROR: line $LINENO: $BASH_COMMAND" >&2' ERR
+
 export DEBIAN_FRONTEND=noninteractive
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -24,12 +25,14 @@ if [ "$(id -u)" -ne 0 ]; then
   echo "Run as root."
   exit 1
 fi
+
 if ! command -v systemctl >/dev/null 2>&1; then
   echo "systemd not found. This script needs a normal Ubuntu server."
   exit 1
 fi
 
 DEFAULT_IP="$(hostname -I | awk '{print $1}')"
+
 PUBLIC_HOST="${PUBLIC_HOST:-}"
 OPENROUTER_API_KEY="${OPENROUTER_API_KEY:-}"
 GROQ_API_KEY="${GROQ_API_KEY:-}"
@@ -39,6 +42,7 @@ OPENAI_API_KEY="${OPENAI_API_KEY:-}"
 KIMI_API_KEY="${KIMI_API_KEY:-}"
 
 PROMPT_FD=""
+
 if [ -t 0 ]; then
   PROMPT_FD=0
 elif [ -r /dev/tty ]; then
@@ -51,12 +55,15 @@ prompt_text() {
   local __label="$2"
   local __default="${3:-}"
   local __value=""
+
   [ -z "$PROMPT_FD" ] && return 0
+
   if [ -n "$__default" ]; then
     printf "%s [%s]: " "$__label" "$__default" > /dev/tty
   else
     printf "%s: " "$__label" > /dev/tty
   fi
+
   IFS= read -r -u "$PROMPT_FD" __value || true
   [ -z "$__value" ] && __value="$__default"
   printf -v "$__var" '%s' "$__value"
@@ -66,7 +73,9 @@ prompt_key_visible() {
   local __var="$1"
   local __label="$2"
   local __value=""
+
   [ -z "$PROMPT_FD" ] && return 0
+
   printf "%s (press Enter to skip): " "$__label" > /dev/tty
   IFS= read -r -u "$PROMPT_FD" __value || true
   printf -v "$__var" '%s' "$__value"
@@ -94,6 +103,9 @@ fi
 if [ -z "${OPENROUTER_API_KEY}${GROQ_API_KEY}${KIMI_API_KEY}" ]; then
   echo "At least one currently supported key is required:"
   echo "OPENROUTER_API_KEY, GROQ_API_KEY, or KIMI_API_KEY."
+  echo
+  echo "Gemini / Anthropic / OpenAI keys can be stored now,"
+  echo "but they are not enough by themselves for the current app version."
   exit 1
 fi
 
@@ -101,7 +113,7 @@ PI_PUBLIC_URL="http://${PUBLIC_HOST}"
 
 log "Installing packages"
 aptx update
-aptx install -y --no-install-recommends python3-full python3-venv nginx rsync git curl wget
+aptx install -y --no-install-recommends python3-full python3-venv nginx rsync git curl
 
 log "Creating service user"
 id -u "$SERVICE_USER" >/dev/null 2>&1 || \
@@ -152,6 +164,7 @@ log "Writing env file"
   printf 'KIMI_API_KEY=%s\n' "$KIMI_API_KEY"
   printf 'PI_PUBLIC_URL=%s\n' "$PI_PUBLIC_URL"
 } > "$ENV_FILE"
+
 chmod 600 "$ENV_FILE"
 
 log "Writing systemd service"
@@ -159,6 +172,7 @@ cat > "$SERVICE_FILE" <<'UNITEOF'
 [Unit]
 Description=PI Browser Agent
 After=network.target
+
 [Service]
 Type=simple
 User=my-agent
@@ -170,6 +184,7 @@ Restart=on-failure
 RestartSec=2
 NoNewPrivileges=true
 PrivateTmp=true
+
 [Install]
 WantedBy=multi-user.target
 UNITEOF
@@ -179,17 +194,21 @@ cat > "$NGINX_SITE" <<'NGINXEOF'
 server {
     listen 80;
     server_name _;
+
     location = / {
         if ($query_string = "") {
             return 404;
         }
+
         proxy_pass http://127.0.0.1:8000;
         proxy_http_version 1.1;
+
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
+
     location /events {
         proxy_pass http://127.0.0.1:8000/events;
         proxy_http_version 1.1;
@@ -197,14 +216,17 @@ server {
         proxy_buffering off;
         proxy_cache off;
         proxy_read_timeout 1h;
+
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
+
     location / {
         proxy_pass http://127.0.0.1:8000;
         proxy_http_version 1.1;
+
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -223,13 +245,17 @@ import secrets
 import shutil
 import sys
 from pathlib import Path
+
 sys.path.insert(0, "/opt/my-agent")
 from db import init_db, get_or_create_session, update_session_state, session_html_path
+
 APP = Path("/opt/my-agent")
 ALIAS_FILE = APP / "session_aliases.json"
 GLOBAL_FILE = APP / "global_model.json"
 TEMPLATE = APP / "default_terminal.html"
+
 base = "-projects-pi-ru"
+
 if ALIAS_FILE.exists():
     aliases = json.loads(ALIAS_FILE.read_text(encoding="utf-8"))
     admin_alias = next((k for k, v in aliases.items() if v == "private"), None)
@@ -245,15 +271,22 @@ else:
         admin_alias: "private",
     }
     ALIAS_FILE.write_text(json.dumps(aliases, ensure_ascii=False, indent=2), encoding="utf-8")
+
 if not GLOBAL_FILE.exists():
-    GLOBAL_FILE.write_text(json.dumps({"provider": "groq", "model": "llama-3.1-8b-instant"}, ensure_ascii=False, indent=2), encoding="utf-8")
+    GLOBAL_FILE.write_text(json.dumps({
+        "provider": "groq",
+        "model": "llama-3.1-8b-instant"
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
+
 init_db()
+
 for name in ["default", "slot1", "slot2", "slot3", "slot4", "slot5", "private"]:
     s = get_or_create_session(name, provider="groq", model="llama-3.1-8b-instant")
     update_session_state(s["id"], "groq", "llama-3.1-8b-instant")
     dst = session_html_path(s["id"])
     if not dst.exists():
         shutil.copy2(TEMPLATE, dst)
+
 print("ADMIN_ALIAS=" + (admin_alias or ""))
 PY
 
@@ -263,6 +296,7 @@ log "Starting services"
 systemctl daemon-reload
 systemctl enable my-agent
 systemctl restart my-agent
+
 nginx -t
 systemctl enable nginx
 systemctl restart nginx
@@ -278,37 +312,46 @@ PI_PUBLIC_URL="$PI_PUBLIC_URL" python3 - <<'PY'
 import json
 import os
 from pathlib import Path
+
 base_url = os.environ.get("PI_PUBLIC_URL", "").rstrip("/")
 alias_file = Path("/opt/my-agent/session_aliases.json")
+
 if not alias_file.exists():
     print("Alias file not found:")
-    print(" /opt/my-agent/session_aliases.json")
+    print("   /opt/my-agent/session_aliases.json")
     print()
     print("Done.")
     raise SystemExit(0)
+
 data = json.loads(alias_file.read_text(encoding="utf-8"))
+
 admin_alias = None
 client_aliases = []
+
 for alias, target in data.items():
     if target == "private" and admin_alias is None:
         admin_alias = alias
     else:
         client_aliases.append(alias)
+
 if admin_alias:
     print("Admin panel:")
-    print(f" {base_url}/?{admin_alias}")
+    print(f"   {base_url}/?{admin_alias}")
     print()
+
 if client_aliases:
     print("Client panels:")
     for alias in client_aliases[:3]:
-        print(f" {base_url}/?{alias}")
+        print(f"   {base_url}/?{alias}")
     print()
+
 print("Helpful commands:")
-print(" systemctl status my-agent")
-print(" journalctl -u my-agent -f")
-print(" cd /opt/my-agent")
-print(" cat /opt/my-agent/session_aliases.json")
+print("   systemctl status my-agent")
+print("   journalctl -u my-agent -f")
+print("   cd /opt/my-agent")
+print("   cat /opt/my-agent/session_aliases.json")
 print()
 print("Done.")
 PY
+
 echo
