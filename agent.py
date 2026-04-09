@@ -4,9 +4,7 @@ import re
 import subprocess
 import shlex
 from typing import List, Dict
-
 import requests
-
 from db import (
     add_message,
     clear_history,
@@ -21,6 +19,7 @@ from db import (
 )
 
 COMMAND_PREFIX = "Ким"
+
 
 class Agent:
     GROQ_LABELS = {
@@ -62,12 +61,10 @@ class Agent:
         self.groq_key = os.getenv("GROQ_API_KEY", "").strip()
         self.openrouter_key = os.getenv("OPENROUTER_API_KEY", "").strip()
         self.kimi_key = os.getenv("KIMI_API_KEY", "").strip()
-
         self.default_provider = os.getenv("PI_DEFAULT_PROVIDER", "groq").strip() or "groq"
         self.default_groq_model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant").strip()
         self.default_openrouter_model = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o").strip()
         self.default_kimi_model = os.getenv("KIMI_MODEL", "kimi-k2.5").strip()
-
         self.timeout = 90
 
     def default_model_for(self, provider: str) -> str:
@@ -80,7 +77,6 @@ class Agent:
     def label_for(self, provider: str, model: str) -> str:
         provider = (provider or "").strip().lower()
         model = (model or "").strip()
-
         if provider == "groq":
             return self.GROQ_LABELS.get(model, model)
         if provider == "openrouter":
@@ -98,7 +94,6 @@ class Agent:
     def model_options(self) -> List[Dict]:
         """Порядок: GROQ → Kimi → OpenRouter"""
         models = []
-
         # 1. GROQ
         if self.groq_key:
             try:
@@ -118,12 +113,10 @@ class Agent:
                 for mid in fallback:
                     name = self.GROQ_LABELS.get(mid, f"Groq · {mid}")
                     models.append({"name": name, "provider": "groq", "model": mid})
-
         # 2. Kimi
         if self.kimi_key:
             for name, mid in self.KIMI_MODELS:
                 models.append({"name": f"Kimi · {name}", "provider": "kimi", "model": mid})
-
         # 3. OpenRouter
         if self.openrouter_key:
             try:
@@ -172,10 +165,8 @@ class Agent:
                 models.append({"name": "OpenRouter · free (automatic free tier)", "provider": "openrouter", "model": "openrouter/free"})
                 for name, mid in self.OPENROUTER_FAVORITES:
                     models.append({"name": f"OpenRouter · {name}", "provider": "openrouter", "model": mid})
-
         if not models:
             models = [{"name": "Llama 3.1 8B", "provider": "groq", "model": "llama-3.1-8b-instant"}]
-
         return models
 
     def ensure_session(self, session_name: str, provider=None, model=None):
@@ -250,9 +241,7 @@ class Agent:
     def _apply_css_to_html(self, html: str, css: str) -> str:
         """Вставляет CSS агента в конец head, удаляя предыдущий блок."""
         style_tag = f'<style id="agent-style">\n{css}\n</style>'
-        # Удаляем предыдущий блок с id="agent-style", если был
         html = re.sub(r'<style\s+id="agent-style">.*?</style>', '', html, flags=re.DOTALL)
-        # Вставляем новый блок перед закрывающим </head>
         if '</head>' in html:
             new_html = html.replace('</head>', f'{style_tag}\n</head>')
         else:
@@ -279,17 +268,14 @@ class Agent:
     def _system_prompt(self) -> str:
         return f"""
 Ты — дружелюбный помощник по имени {COMMAND_PREFIX}. Общайся естественно, живо, по-русски. Отвечай как живой человек, можешь шутить, размышлять, выражать эмоции.
-
 Важные правила (но не делай их навязчивыми):
 - Если пользователь не называет тебя по имени "{COMMAND_PREFIX}", ты просто болтаешь, но не выполняешь команды на сервере и не меняешь внешний вид страницы.
 - Если пользователь обратился "{COMMAND_PREFIX}, сделай то-то" — ты можешь выполнить команду (shell) или изменить CSS.
 - Никогда не удаляй кнопки управления (undo, redo, clear, refresh, выбор сессии, блок модели).
-
 Формат ответа — ТОЛЬКО JSON, без пояснений:
 - Обычный разговор: {{ "mode": "chat", "assistant": "твой ответ" }}
 - Команда shell: {{ "mode": "shell", "assistant": "пояснение", "command": "команда" }}
 - Изменение CSS: {{ "mode": "edit_css", "assistant": "пояснение", "css": "body {{ background: black; }}" }}
-
 Будь собой — открытым и приятным.
 """.strip()
 
@@ -333,28 +319,22 @@ class Agent:
         clean_message = (message or "").strip()
         if not clean_message:
             return {"success": False, "error": "Пустое сообщение"}
-
         lower_msg = clean_message.lower()
         prefix_lower = COMMAND_PREFIX.lower()
-        has_command_keyword = (lower_msg.startswith(prefix_lower + " ") or 
+        has_command_keyword = (lower_msg.startswith(prefix_lower + " ") or
                                lower_msg.startswith(prefix_lower + ",") or
                                f" {prefix_lower} " in lower_msg or
                                lower_msg.endswith(f" {prefix_lower}"))
-
         modified_message = clean_message
-
         lower = modified_message.lower()
         if lower in {"/undo", "undo", "откати назад", "откатить назад", "верни назад", "верни как было"}:
             return self.undo(session_name)
         if lower in {"/clear", "/clear-history", "очисти историю", "сотри историю"}:
             return self.clear(session_name)
-
         session = self.ensure_session(session_name, provider=provider, model=model)
         provider = session["provider"]
         model = session["model"]
-
         add_message(session["id"], "user", modified_message, None, None)
-
         history = get_history(session["id"], limit=20)
         compact_history = []
         for item in history[-10:]:
@@ -362,9 +342,7 @@ class Agent:
             content = str(item["message"] or "").strip()
             if content:
                 compact_history.append({"role": role, "content": content[:800]})
-
         current_html = read_session_html(session["id"])
-
         messages = [
             {"role": "system", "content": self._system_prompt()},
             {
@@ -382,7 +360,6 @@ class Agent:
                 ),
             },
         ]
-
         try:
             raw_reply = self._call_provider(provider, model, messages)
             data = self._extract_json(raw_reply)
@@ -398,11 +375,9 @@ class Agent:
                 "label": self.label_for(provider, model),
                 "error": str(e)
             }
-
         mode = str(data.get("mode") or "chat").strip().lower()
         assistant_text = str(data.get("assistant") or "").strip() or "Готово."
         changed = False
-
         if mode == "shell" and has_command_keyword:
             command = data.get("command", "").strip()
             if command:
@@ -418,7 +393,6 @@ class Agent:
                     "model": model,
                     "label": self.label_for(provider, model),
                 }
-
         elif mode == "edit_css" and has_command_keyword:
             css = data.get("css", "").strip()
             if css:
@@ -439,7 +413,6 @@ class Agent:
                 assistant_text = "CSS обновлён."
             else:
                 assistant_text = "Не удалось применить CSS (пустая строка)."
-
         elif mode == "edit_full" and has_command_keyword:
             html = str(data.get("html") or "").strip()
             if html:
@@ -458,7 +431,6 @@ class Agent:
                 save_session_html(session["id"], new_html)
                 changed = True
                 assistant_text = assistant_text or "HTML обновлён."
-
         add_message(session["id"], "assistant", assistant_text, provider, model)
         return {
             "success": True,
@@ -499,13 +471,44 @@ class Agent:
                 return False
         return True
 
+    # ==================== НОВЫЙ МЕТОД БРАУЗЕРА ====================
+    def browse_page(self, url: str, timeout: int = 30) -> str:
+        """Полноценный браузер: заходит по любой ссылке, ждёт JS и возвращает текст страницы"""
+        try:
+            from playwright.sync_api import sync_playwright
+            with sync_playwright() as p:
+                browser = p.chromium.launch(
+                    headless=True,
+                    args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+                )
+                page = browser.new_page()
+                page.set_default_timeout(timeout * 1000)
+                
+                response = page.goto(url, wait_until="networkidle", timeout=timeout*1000)
+                
+                if not response or response.status >= 400:
+                    return f"Ошибка: страница {url} не загрузилась (статус {response.status if response else 'None'})"
+                
+                title = page.title()
+                text = page.locator("body").inner_text()
+                
+                browser.close()
+                return f"Заголовок: {title}\n\n{text[:20000]}"  # обрезаем, чтобы не перегружать модель
+            
+        except Exception as e:
+            return f"Ошибка браузера: {str(e)}"
+    # ============================================================
+
 
 agent = Agent()
+
 
 # GLOBAL_MODEL_OVERRIDE
 import json as _gmo_json
 from pathlib import Path as _gmo_Path
 _GMO_FILE = _gmo_Path("/opt/my-agent/global_model.json")
+
+
 def _gmo_load():
     try:
         data = _gmo_json.loads(_GMO_FILE.read_text(encoding="utf-8"))
@@ -516,6 +519,8 @@ def _gmo_load():
     except Exception:
         pass
     return None, None
+
+
 if not getattr(Agent.chat, "__name__", "") == "_agent_chat_with_global_model":
     _AGENT_CHAT_ORIG = Agent.chat
     def _agent_chat_with_global_model(self, session_name: str, message: str, provider=None, model=None):
