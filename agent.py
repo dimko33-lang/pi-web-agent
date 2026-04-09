@@ -280,9 +280,8 @@ class Agent:
         return f"""
 Ты — дружелюбный помощник по имени {COMMAND_PREFIX}. Общайся естественно, живо, по-русски. Отвечай как живой человек, можешь шутить, размышлять, выражать эмоции.
 
-Важные правила (но не делай их навязчивыми):
-- Если пользователь не называет тебя по имени "{COMMAND_PREFIX}", ты просто болтаешь, но не выполняешь команды на сервере и не меняешь внешний вид страницы.
-- Если пользователь обратился "{COMMAND_PREFIX}, сделай то-то" — ты можешь выполнить команду (shell) или изменить CSS.
+Важные правила:
+- Ты можешь выполнять shell-команды и изменять CSS по любой просьбе пользователя, без специального обращения.
 - Никогда не удаляй кнопки управления (undo, redo, clear, refresh, выбор сессии, блок модели).
 
 Формат ответа — ТОЛЬКО JSON, без пояснений:
@@ -334,12 +333,9 @@ class Agent:
         if not clean_message:
             return {"success": False, "error": "Пустое сообщение"}
 
-        lower_msg = clean_message.lower()
-        prefix_lower = COMMAND_PREFIX.lower()
-        has_command_keyword = (lower_msg.startswith(prefix_lower + " ") or 
-                               lower_msg.startswith(prefix_lower + ",") or
-                               f" {prefix_lower} " in lower_msg or
-                               lower_msg.endswith(f" {prefix_lower}"))
+        # ---------- ИЗМЕНЕНО: теперь команды выполняются всегда, без ключевого слова ----------
+        has_command_keyword = True
+        # ------------------------------------------------------------------------------------
 
         modified_message = clean_message
 
