@@ -355,17 +355,27 @@ body::after {
     cursor:pointer;
 }
 
+/* ★ ИСПРАВЛЕННЫЙ СЕЛЕКТ СЕССИЙ ★ */
 #adminControls select{
-    height:21px;        /* уменьшена высота */
+    height:21px;
     min-height:21px;
-    width:72px;
-    min-width:72px;
-    max-width:72px;
-    padding:0 16px 0 6px;
+    width:90px;                  /* увеличена ширина */
+    min-width:90px;
+    max-width:90px;
+    padding:0 8px 0 6px;         /* отступы для текста */
     text-align-last:center;
     line-height:19px;
     background:rgba(255,255,255,0.08);
     backdrop-filter:blur(4px);
+    appearance: none;            /* убираем стандартную стрелку */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    cursor: pointer;
+}
+
+/* Убираем стандартную стрелку в IE */
+#adminControls select::-ms-expand {
+    display: none;
 }
 
 #adminControls select:hover,
@@ -568,14 +578,21 @@ body::after {
         min-width:38px;
     }
 
+    /* ★ МОБИЛЬНАЯ ВЕРСИЯ СЕЛЕКТА ★ */
     #adminControls select{
-        height:19px;        /* уменьшена высота */
+        height:19px;
         min-height:19px;
-        width:66px;
-        min-width:66px;
-        max-width:66px;
-        padding:0 14px 0 5px;
+        width:80px;                  /* немного уже, но текст влезает */
+        min-width:80px;
+        max-width:80px;
+        padding:0 6px 0 4px;
         line-height:17px;
+        appearance: none;
+        -webkit-appearance: none;
+    }
+
+    #adminControls select::-ms-expand {
+        display: none;
     }
 
     #modelDock{
