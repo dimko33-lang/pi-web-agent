@@ -2,3 +2,4 @@ Flask
 gunicorn
 gevent
 requests
+playwright
