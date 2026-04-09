@@ -2,5 +2,3 @@ Flask
 gunicorn
 gevent
 requests
-beautifulsoup4
-lxml
