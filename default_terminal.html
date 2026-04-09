@@ -23,7 +23,7 @@ html, body{
 }
 
 body{
-    background: rgb(20,20,25);
+    background: rgb(30, 42, 58);   /* фон изменён */
     color:#fff;
     font-family:'Inter',system-ui,sans-serif;
     font-style: italic;
@@ -68,7 +68,7 @@ body{
 }
 
 #messageInput::placeholder{
-    color:rgba(255,255,255,0.25);
+    color:rgba(255,255,255,0.15);  /* блёклая подсказка */
     font-style: italic;
 }
 
@@ -110,6 +110,7 @@ body{
     align-items:center;
     gap:8px;
     z-index:20;
+    padding-top: 3px;   /* отступ от верхней границы (линии ввода) */
 }
 
 #pathDisplay{
@@ -121,13 +122,14 @@ body{
     letter-spacing:0.01em;
     font-style: italic;
     margin-right:auto;
+    /* обрезание убрано */
 }
 
 #rightGroup{
     margin-left:auto;
     display:flex;
     align-items:center;
-    gap:2px;
+    gap:3px;            /* увеличенный отступ между группами */
     flex-shrink:0;
     min-width:0;
 }
@@ -135,7 +137,7 @@ body{
 #publicControls{
     display:none;
     align-items:center;
-    gap:2px;
+    gap:3px;            /* увеличенное расстояние между кнопками */
 }
 
 #publicControls button{
@@ -151,8 +153,8 @@ body{
     backdrop-filter:blur(4px);
     -webkit-backdrop-filter:blur(4px);
     transition:all 0.2s;
-    height:20px;
-    min-height:20px;
+    height:24px;        /* средняя высота */
+    min-height:24px;
     padding:0 7px;
     min-width:42px;
     display:inline-flex;
@@ -170,7 +172,7 @@ body{
 #adminControls{
     display:none;
     align-items:center;
-    gap:2px;
+    gap:3px;            /* увеличенный зазор */
     min-width:0;
     flex:0 1 auto;
     overflow-x:auto;
@@ -200,8 +202,8 @@ body{
 }
 
 #adminControls button{
-    height:20px;
-    min-height:20px;
+    height:24px;        /* средняя высота */
+    min-height:24px;
     padding:0 7px;
     min-width:42px;
     display:inline-flex;
@@ -212,14 +214,14 @@ body{
 }
 
 #adminControls select{
-    height:20px;
-    min-height:20px;
+    height:24px;        /* средняя высота */
+    min-height:24px;
     width:72px;
     min-width:72px;
     max-width:72px;
     padding:0 16px 0 6px;
     text-align-last:center;
-    line-height:18px;
+    line-height:22px;
     background:rgba(255,255,255,0.08);
     backdrop-filter:blur(4px);
 }
@@ -380,35 +382,35 @@ body{
     #bottomBar{
         gap:6px;
         align-items:center;
+        padding-top: 3px;   /* сохраняем отступ */
     }
 
     #pathDisplay{
         font-size:12px;
-        max-width:80px;
-        overflow:hidden;
+        overflow:visible;
     }
 
     #rightGroup{
-        gap:2px;
+        gap:3px;
         max-width:calc(100vw - 112px);
         flex-shrink:1;
         min-width:0;
     }
 
     #publicControls{
-        gap:2px;
+        gap:3px;
     }
 
     #publicControls button{
-        height:19px;
-        min-height:19px;
+        height:22px;        /* чуть ниже для мобильных */
+        min-height:22px;
         padding:0 5px;
         min-width:38px;
         font-size:9px;
     }
 
     #adminControls{
-        gap:2px;
+        gap:3px;
         overflow-x:auto;
     }
 
@@ -418,20 +420,20 @@ body{
     }
 
     #adminControls button{
-        height:19px;
-        min-height:19px;
+        height:22px;
+        min-height:22px;
         padding:0 5px;
         min-width:38px;
     }
 
     #adminControls select{
-        height:19px;
-        min-height:19px;
+        height:22px;
+        min-height:22px;
         width:66px;
         min-width:66px;
         max-width:66px;
         padding:0 14px 0 5px;
-        line-height:17px;
+        line-height:20px;
     }
 
     #modelDock{
@@ -519,6 +521,7 @@ body{
 <div id="fullscreenZone"><span>FULL</span></div>
 
 <script>
+/* JavaScript без изменений */
 const rawAlias = location.search.length > 1 ? decodeURIComponent(location.search.slice(1)) : '';
 const ADMIN_HEADER = rawAlias;
 const MODEL_LABEL_STORAGE_KEY = 'pi_last_model_label';
