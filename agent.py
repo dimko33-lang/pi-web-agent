@@ -3,7 +3,8 @@ import os
 import re
 import subprocess
 import shlex
-from typing import List, Dict
+import time
+from typing import List, Dict, Optional
 
 import requests
 
@@ -69,7 +70,9 @@ class Agent:
         self.default_openrouter_model = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o").strip()
         self.default_kimi_model = os.getenv("KIMI_MODEL", "kimi-k2.5").strip()
 
-        self.timeout = 90
+        # Увеличиваем таймаут для медленных моделей
+        self.timeout = 120
+        self.max_retries = 2
 
     def default_model_for(self, provider: str) -> str:
         if provider == "openrouter":
@@ -260,56 +263,84 @@ class Agent:
             return html
         return new_html
 
-    def _extract_json(self, text: str) -> dict:
+    def _safe_parse_json(self, text: str) -> dict:
+        """Надёжный парсер JSON с восстановлением после ошибок"""
         raw = (text or "").strip()
         if not raw:
-            raise ValueError("Модель вернула пустой ответ")
+            return {"mode": "chat", "assistant": "Модель вернула пустой ответ"}
+
+        # Попытка 1: прямой парсинг
         try:
             return json.loads(raw)
-        except Exception:
+        except:
             pass
+
+        # Попытка 2: ищем JSON в markdown-блоке
         fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, re.S | re.I)
         if fenced:
             try:
                 return json.loads(fenced.group(1).strip())
-            except Exception:
+            except:
                 pass
+
+        # Попытка 3: ищем фигурные скобки
         start = raw.find("{")
         end = raw.rfind("}")
         if start != -1 and end != -1 and end > start:
             try:
                 return json.loads(raw[start:end+1])
-            except Exception:
+            except:
                 pass
-        raise ValueError("Модель вернула невалидный JSON (fallback)")
 
-    def _system_prompt(self) -> str:
-        return f"""
-Ты — дружелюбный помощник по имени {COMMAND_PREFIX}. Общайся естественно, живо, по-русски. Отвечай как живой человек, можешь шутить, размышлять, выражать эмоции.
+        # Если всё сломалось — возвращаем безопасную заглушку
+        return {"mode": "chat", "assistant": raw[:500]}
 
-ВАЖНО: ты работаешь в двух режимах.
-1. ОБЫЧНЫЙ РАЗГОВОР — если пользователь НЕ обратился к тебе по имени "{COMMAND_PREFIX}". Ты просто отвечаешь как собеседник, не выполняешь никаких действий на сервере и не меняешь CSS.
-2. РЕЖИМ КОМАНД — если пользователь ЯВНО обратился "{COMMAND_PREFIX}" (например, "{COMMAND_PREFIX}, измени фон на чёрный"). В этом режиме ты можешь выполнить shell-команду или изменить CSS. Если команда не требуется, можно ответить и в режиме chat.
+    def _system_prompt(self, simple: bool = False) -> str:
+        if simple:
+            return """Ты — помощник Ким. Отвечай на русском языке в формате JSON:
+{"mode": "chat", "assistant": "твой ответ"}
+Если пользователь просит выполнить команду: {"mode": "shell", "assistant": "пояснение", "command": "команда"}
+Если просит изменить дизайн: {"mode": "edit_css", "assistant": "пояснение", "css": "CSS код"}
 
-Запрещено удалять или скрывать кнопки управления (undo, redo, clear, refresh, выбор сессии, блок модели).
+ВАЖНО: Только JSON, без лишнего текста!"""
+        
+        return f"""Ты — дружелюбный помощник по имени {COMMAND_PREFIX}. Твоя задача — помогать пользователю управлять сервером через shell-команды и менять CSS дизайн страницы.
 
-!!! КРИТИЧЕСКИ ВАЖНО !!!
-Твой ответ должен быть **ТОЛЬКО** JSON-объектом. Никакого текста до или после фигурных скобок. Только чистая JSON-строка.
-Примеры:
-- Разговор: {{"mode": "chat", "assistant": "Привет! Как дела?"}}
-- Команда: {{"mode": "shell", "assistant": "Выполняю", "command": "ls -la"}}
-- CSS: {{"mode": "edit_css", "assistant": "Меняю фон", "css": "body {{ background: black; }}"}}
+ПРАВИЛА РАБОТЫ:
+1. Если пользователь просто общается (нет команды "{COMMAND_PREFIX}") — отвечай в режиме chat.
+2. Если пользователь обратился "{COMMAND_PREFIX}, сделай X" — используй режим shell или edit_css.
 
-Если ты не уверен, что ответил строго по формату – перепроверь. Не добавляй комментарии, пояснения, лишние пробелы вне JSON.
-""".strip()
+ФОРМАТ ОТВЕТА (СТРОГО JSON, БЕЗ КОММЕНТАРИЕВ):
+- Разговор: {{"mode": "chat", "assistant": "текст ответа"}}
+- Команда: {{"mode": "shell", "assistant": "пояснение", "command": "shell команда"}}
+- CSS: {{"mode": "edit_css", "assistant": "пояснение", "css": "CSS код"}}
 
-    def _call_provider(self, provider: str, model: str, messages: list) -> str:
+ПРИМЕРЫ:
+Пользователь: "Привет, как дела?"
+Ответ: {{"mode": "chat", "assistant": "Привет! Всё отлично, как у тебя?"}}
+
+Пользователь: "{COMMAND_PREFIX}, покажи список файлов"
+Ответ: {{"mode": "shell", "assistant": "Показываю файлы", "command": "ls -la"}}
+
+Пользователь: "{COMMAND_PREFIX}, сделай фон чёрным"
+Ответ: {{"mode": "edit_css", "assistant": "Меняю фон", "css": "body {{ background: black; }}"}}
+
+ВАЖНО: Отвечай ТОЛЬКО JSON. Никакого текста до или после фигурных скобок!"""
+
+    def _call_provider(self, provider: str, model: str, messages: list, retry_count: int = 0) -> str:
         provider = (provider or "").strip().lower()
+        
         if provider == "groq":
             if not self.groq_key:
                 raise RuntimeError("GROQ_API_KEY не задан")
             url = "https://api.groq.com/openai/v1/chat/completions"
             headers = {"Authorization": f"Bearer {self.groq_key}", "Content-Type": "application/json"}
+            payload = {
+                "model": model, 
+                "messages": messages,
+                "response_format": {"type": "json_object"},  # Принудительный JSON для Groq
+                "temperature": 0.7 if retry_count == 0 else 0.3  # Снижаем температуру при повторе
+            }
         elif provider == "openrouter":
             if not self.openrouter_key:
                 raise RuntimeError("OPENROUTER_API_KEY не задан")
@@ -320,23 +351,41 @@ class Agent:
                 "HTTP-Referer": os.getenv("PI_PUBLIC_URL", "http://localhost"),
                 "X-Title": "Pi Browser Agent",
             }
+            payload = {
+                "model": model, 
+                "messages": messages,
+                "response_format": {"type": "json_object"},
+                "temperature": 0.7 if retry_count == 0 else 0.3
+            }
         elif provider == "kimi":
             if not self.kimi_key:
                 raise RuntimeError("KIMI_API_KEY не задан")
             url = "https://api.moonshot.ai/v1/chat/completions"
             headers = {"Authorization": f"Bearer {self.kimi_key}", "Content-Type": "application/json"}
+            payload = {
+                "model": model, 
+                "messages": messages,
+                "response_format": {"type": "json_object"},
+                "temperature": 0.7 if retry_count == 0 else 0.3
+            }
         else:
             raise RuntimeError(f"Неизвестный provider: {provider}")
-        payload = {"model": model, "messages": messages}
-        resp = requests.post(url, headers=headers, json=payload, timeout=self.timeout)
-        if not resp.ok:
-            try:
-                err = resp.json()
-                raise RuntimeError(f"{provider} error {resp.status_code}: {json.dumps(err, ensure_ascii=False)}")
-            except Exception:
-                raise RuntimeError(f"{provider} error {resp.status_code}: {resp.text[:800]}")
-        data = resp.json()
-        return data["choices"][0]["message"]["content"] or ""
+
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=self.timeout)
+            if not resp.ok:
+                try:
+                    err = resp.json()
+                    raise RuntimeError(f"{provider} error {resp.status_code}: {json.dumps(err, ensure_ascii=False)}")
+                except:
+                    raise RuntimeError(f"{provider} error {resp.status_code}: {resp.text[:800]}")
+            data = resp.json()
+            return data["choices"][0]["message"]["content"] or ""
+        except requests.Timeout:
+            if retry_count < self.max_retries:
+                time.sleep(2)
+                return self._call_provider(provider, model, messages, retry_count + 1)
+            raise RuntimeError(f"Таймаут при обращении к {provider}")
 
     def chat(self, session_name: str, message: str, provider=None, model=None):
         session_name = (session_name or "default").strip() or "default"
@@ -344,135 +393,106 @@ class Agent:
         if not clean_message:
             return {"success": False, "error": "Пустое сообщение"}
 
+        # Проверяем, является ли сообщение командой
         lower_msg = clean_message.lower()
         prefix_lower = COMMAND_PREFIX.lower()
-        has_command_keyword = (lower_msg.startswith(prefix_lower + " ") or 
-                               lower_msg.startswith(prefix_lower + ",") or
-                               f" {prefix_lower} " in lower_msg or
-                               lower_msg.endswith(f" {prefix_lower}"))
+        has_command_keyword = (
+            lower_msg.startswith(prefix_lower + " ") or 
+            lower_msg.startswith(prefix_lower + ",") or
+            f" {prefix_lower} " in lower_msg or
+            lower_msg.endswith(f" {prefix_lower}")
+        )
 
-        modified_message = clean_message
-
-        lower = modified_message.lower()
+        # Обработка встроенных команд
+        lower = clean_message.lower()
         if lower in {"/undo", "undo", "откати назад", "откатить назад", "верни назад", "верни как было"}:
             return self.undo(session_name)
         if lower in {"/clear", "/clear-history", "очисти историю", "сотри историю"}:
             return self.clear(session_name)
 
+        # Получаем или создаём сессию
         session = self.ensure_session(session_name, provider=provider, model=model)
         provider = session["provider"]
         model = session["model"]
 
-        add_message(session["id"], "user", modified_message, None, None)
+        add_message(session["id"], "user", clean_message, None, None)
 
+        # Получаем историю (только последние 10 сообщений, без HTML)
         history = get_history(session["id"], limit=20)
         compact_history = []
         for item in history[-10:]:
             role = "assistant" if item["role"] == "assistant" else "user"
             content = str(item["message"] or "").strip()
             if content:
-                compact_history.append({"role": role, "content": content[:800]})
+                # Обрезаем длинные сообщения
+                compact_history.append({"role": role, "content": content[:500]})
 
-        current_html = read_session_html(session["id"])
-
+        # Формируем сообщения для модели
         messages = [
             {"role": "system", "content": self._system_prompt()},
-            {
-                "role": "user",
-                "content": json.dumps(
-                    {
-                        "session": session["name"],
-                        "provider": provider,
-                        "model": model,
-                        "history": compact_history,
-                        "current_html": current_html,
-                        "user_message": modified_message,
-                    },
-                    ensure_ascii=False,
-                ),
-            },
+            {"role": "user", "content": json.dumps({
+                "history": compact_history,
+                "user_message": clean_message,
+                "is_command": has_command_keyword
+            }, ensure_ascii=False)}
         ]
 
-        try:
-            raw_reply = self._call_provider(provider, model, messages)
+        # Пробуем получить ответ от модели (с повторными попытками при ошибке)
+        for attempt in range(self.max_retries + 1):
             try:
-                data = self._extract_json(raw_reply)
-            except ValueError:
-                data = {"mode": "chat", "assistant": raw_reply.strip()}
-        except Exception as e:
-            error_text = f"Ошибка обработки ответа модели: {str(e)}"
-            add_message(session["id"], "assistant", error_text, provider, model)
-            return {
-                "success": False,
-                "reply": error_text,
-                "changed": False,
-                "provider": provider,
-                "model": model,
-                "label": self.label_for(provider, model),
-                "error": str(e)
-            }
+                raw_reply = self._call_provider(provider, model, messages, attempt)
+                data = self._safe_parse_json(raw_reply)
+                
+                # Проверяем, что данные корректные
+                if not isinstance(data, dict):
+                    data = {"mode": "chat", "assistant": str(data)}
+                break
+            except Exception as e:
+                if attempt == self.max_retries:
+                    # Последняя попытка — возвращаем ошибку
+                    error_text = f"Ошибка: {str(e)}"
+                    add_message(session["id"], "assistant", error_text, provider, model)
+                    return {
+                        "success": False,
+                        "reply": error_text,
+                        "changed": False,
+                        "provider": provider,
+                        "model": model,
+                        "label": self.label_for(provider, model),
+                        "error": str(e)
+                    }
+                # Пробуем с упрощённым промптом
+                messages[0]["content"] = self._system_prompt(simple=True)
+                time.sleep(1)
 
         mode = str(data.get("mode") or "chat").strip().lower()
         assistant_text = str(data.get("assistant") or "").strip() or "Готово."
         changed = False
 
+        # Выполняем действие в зависимости от режима
         if mode == "shell" and has_command_keyword:
             command = data.get("command", "").strip()
             if command:
                 exec_result = self._execute_command(command)
-                full_output = f"$ {command}\n{exec_result['output']}"
-                assistant_text = full_output
-                add_message(session["id"], "assistant", assistant_text, provider, model)
-                return {
-                    "success": True,
-                    "reply": assistant_text,
-                    "changed": False,
-                    "provider": provider,
-                    "model": model,
-                    "label": self.label_for(provider, model),
-                }
-
+                assistant_text = f"$ {command}\n{exec_result['output']}"
+                
         elif mode == "edit_css" and has_command_keyword:
             css = data.get("css", "").strip()
             if css:
+                current_html = read_session_html(session["id"])
                 new_html = self._apply_css_to_html(current_html, css)
-                if not self._check_html_integrity(new_html):
-                    error_msg = "Попытка сохранить HTML без кнопок undo/redo. Отказано."
-                    add_message(session["id"], "assistant", error_msg, provider, model)
-                    return {
-                        "success": False,
-                        "reply": error_msg,
-                        "changed": False,
-                        "provider": provider,
-                        "model": model,
-                        "label": self.label_for(provider, model),
-                    }
-                save_session_html(session["id"], new_html)
-                changed = True
-                assistant_text = "CSS обновлён."
+                if self._check_html_integrity(new_html):
+                    save_session_html(session["id"], new_html)
+                    changed = True
+                    assistant_text = "CSS обновлён."
+                else:
+                    assistant_text = "Ошибка: нельзя удалять кнопки управления."
             else:
-                assistant_text = "Не удалось применить CSS (пустая строка)."
+                assistant_text = "Не указан CSS код."
 
-        elif mode == "edit_full" and has_command_keyword:
-            html = str(data.get("html") or "").strip()
-            if html:
-                new_html = self._extract_html(html)
-                if not self._check_html_integrity(new_html):
-                    error_msg = "Попытка сохранить HTML без кнопок undo/redo. Отказано."
-                    add_message(session["id"], "assistant", error_msg, provider, model)
-                    return {
-                        "success": False,
-                        "reply": error_msg,
-                        "changed": False,
-                        "provider": provider,
-                        "model": model,
-                        "label": self.label_for(provider, model),
-                    }
-                save_session_html(session["id"], new_html)
-                changed = True
-                assistant_text = assistant_text or "HTML обновлён."
-
+        # Сохраняем ответ
         add_message(session["id"], "assistant", assistant_text, provider, model)
+        
         return {
             "success": True,
             "reply": assistant_text,
@@ -482,30 +502,10 @@ class Agent:
             "label": self.label_for(provider, model),
         }
 
-    def _extract_html(self, text: str) -> str:
-        raw = (text or "").strip()
-        if not raw:
-            raise ValueError("Пустой HTML")
-        fenced = re.search(r"```(?:html)?\s*(.*?)```", raw, re.S | re.I)
-        if fenced:
-            raw = fenced.group(1).strip()
-        doc = re.search(r"(?is)(<!doctype html>.*?</html>|<html\b.*?</html>)", raw)
-        html = doc.group(1).strip() if doc else raw.strip()
-        lower = html.lower()
-        if "<html" not in lower and "<!doctype" not in lower:
-            raise ValueError("Ответ не похож на полный HTML")
-        return html
-
     def _check_html_integrity(self, html: str) -> bool:
         required_ids = [
-            "undoBtn",
-            "redoBtn",
-            "clearBtn",
-            "refreshBtn",
-            "sessionSelect",
-            "modelCurrent",
-            "messageInput",
-            "sendLabel",
+            "undoBtn", "redoBtn", "clearBtn", "refreshBtn",
+            "sessionSelect", "modelCurrent", "messageInput", "sendLabel",
         ]
         for elem_id in required_ids:
             if elem_id not in html:
