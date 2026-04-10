@@ -8,8 +8,13 @@
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&display=swap');
 
+/* ======================================================= */
+/* === ПОМЕТКА: ГЛОБАЛЬНЫЕ НАСТРОЙКИ (меняйте здесь) === */
+/* ======================================================= */
 :root{
-    --dock-right-pad:8px;
+    --dock-right-pad:8px;          /* отступ текста модели от правого края */
+    --button-border-radius: 4px;    /* ★ скругление кнопок и селекта (было 2px) ★ */
+    --skyline-height: 1px;          /* ★ толщина бегущей линии (было 2px) ★ */
 }
 
 *{
@@ -22,7 +27,7 @@ html, body{
     height:100dvh;
 }
 
-/* ===== НОЧНОЕ НЕБО (ГРАДИЕНТ + СБАЛАНСИРОВАННЫЕ ЗВЁЗДЫ) ===== */
+/* ===== НОЧНОЕ НЕБО ===== */
 body{
     background: linear-gradient(180deg, #050914 0%, #1a2333 70%, #2a3a4a 100%);
     color:#fff;
@@ -35,7 +40,8 @@ body{
     position: relative;
 }
 
-/* Звёзды — сбалансированная яркость, естественные скопления */
+/* ★ ПОМЕТКА: ЗВЁЗДЫ — размеры уменьшены в ~2 раза (было 2.2px → 1.1px и т.д.) ★ */
+/* Чтобы изменить яркость или размер — меняйте значения в radial-gradient(1.1px 1.1px ...) */
 body::after {
     content: '';
     position: fixed;
@@ -46,66 +52,61 @@ body::after {
     pointer-events: none;
     z-index: 0;
     background-image: 
-        /* === СКОПЛЕНИЕ 1 (левая верхняя область) === */
-        radial-gradient(2.2px 2.2px at 12% 8%, rgba(255,255,255,0.45) 50%, transparent 55%),
-        radial-gradient(1.8px 1.8px at 15% 11%, rgba(255,240,200,0.38) 50%, transparent 55%),
-        radial-gradient(1.2px 1.2px at 9% 14%, rgba(200,220,255,0.25) 50%, transparent 55%),
-        radial-gradient(2.5px 2.5px at 18% 6%, rgba(255,255,255,0.42) 50%, transparent 55%),
-        radial-gradient(1.5px 1.5px at 21% 9%, rgba(255,255,200,0.35) 50%, transparent 55%),
-        radial-gradient(1px 1px at 14% 13%, rgba(180,200,255,0.18) 50%, transparent 55%),
-
-        /* === СКОПЛЕНИЕ 2 (центрально-правая область) === */
-        radial-gradient(2px 2px at 65% 12%, rgba(255,255,255,0.48) 50%, transparent 55%),
-        radial-gradient(2.3px 2.3px at 68% 8%, rgba(200,220,255,0.4) 50%, transparent 55%),
-        radial-gradient(1.6px 1.6px at 62% 15%, rgba(255,240,200,0.32) 50%, transparent 55%),
-        radial-gradient(1.2px 1.2px at 71% 10%, rgba(255,255,255,0.22) 50%, transparent 55%),
-        radial-gradient(2.8px 2.8px at 75% 5%, rgba(255,255,200,0.45) 50%, transparent 55%),
-        radial-gradient(1px 1px at 66% 18%, rgba(180,200,255,0.16) 50%, transparent 55%),
-
-        /* === СКОПЛЕНИЕ 3 (верхняя средняя) === */
-        radial-gradient(2px 2px at 35% 5%, rgba(255,255,255,0.5) 50%, transparent 55%),
-        radial-gradient(1.8px 1.8px at 38% 9%, rgba(200,220,255,0.38) 50%, transparent 55%),
-        radial-gradient(1.4px 1.4px at 32% 11%, rgba(255,240,200,0.3) 50%, transparent 55%),
-        radial-gradient(2.2px 2.2px at 42% 7%, rgba(255,255,255,0.44) 50%, transparent 55%),
-        radial-gradient(1px 1px at 36% 14%, rgba(255,255,200,0.2) 50%, transparent 55%),
-
-        /* === СКОПЛЕНИЕ 4 (правая дальняя) === */
-        radial-gradient(2.5px 2.5px at 88% 15%, rgba(255,255,255,0.46) 50%, transparent 55%),
-        radial-gradient(1.6px 1.6px at 91% 10%, rgba(200,220,255,0.35) 50%, transparent 55%),
-        radial-gradient(1.2px 1.2px at 85% 18%, rgba(255,240,200,0.25) 50%, transparent 55%),
-        radial-gradient(2px 2px at 94% 12%, rgba(255,255,255,0.4) 50%, transparent 55%),
-        radial-gradient(1px 1px at 89% 20%, rgba(180,200,255,0.15) 50%, transparent 55%),
-
-        /* === СРЕДНИЕ И ТУСКЛЫЕ ЗВЁЗДЫ (распределены по небу) === */
-        radial-gradient(1.5px 1.5px at 5% 22%, rgba(255,255,255,0.3) 50%, transparent 55%),
-        radial-gradient(1.2px 1.2px at 25% 30%, rgba(200,220,255,0.22) 50%, transparent 55%),
-        radial-gradient(1.8px 1.8px at 45% 22%, rgba(255,240,200,0.28) 50%, transparent 55%),
-        radial-gradient(1.4px 1.4px at 55% 30%, rgba(255,255,255,0.25) 50%, transparent 55%),
-        radial-gradient(1px 1px at 70% 28%, rgba(180,200,255,0.18) 50%, transparent 55%),
-        radial-gradient(1.6px 1.6px at 80% 25%, rgba(255,255,200,0.3) 50%, transparent 55%),
-        radial-gradient(1.3px 1.3px at 10% 40%, rgba(255,255,255,0.22) 50%, transparent 55%),
-        radial-gradient(1.5px 1.5px at 30% 42%, rgba(200,220,255,0.26) 50%, transparent 55%),
-        radial-gradient(1.2px 1.2px at 50% 38%, rgba(255,240,200,0.2) 50%, transparent 55%),
-        radial-gradient(1.8px 1.8px at 65% 42%, rgba(255,255,255,0.28) 50%, transparent 55%),
-        radial-gradient(1px 1px at 85% 48%, rgba(180,200,255,0.16) 50%, transparent 55%),
-        radial-gradient(1.4px 1.4px at 20% 55%, rgba(255,255,200,0.24) 50%, transparent 55%),
-        radial-gradient(1.2px 1.2px at 40% 60%, rgba(255,255,255,0.2) 50%, transparent 55%),
-        radial-gradient(1.6px 1.6px at 60% 55%, rgba(200,220,255,0.25) 50%, transparent 55%),
-        radial-gradient(1px 1px at 75% 60%, rgba(255,240,200,0.18) 50%, transparent 55%),
-        radial-gradient(1.3px 1.3px at 90% 55%, rgba(255,255,255,0.22) 50%, transparent 55%),
-        radial-gradient(1.5px 1.5px at 15% 70%, rgba(180,200,255,0.2) 50%, transparent 55%),
-        radial-gradient(1.2px 1.2px at 35% 75%, rgba(255,255,200,0.18) 50%, transparent 55%),
-        radial-gradient(1.8px 1.8px at 55% 70%, rgba(255,255,255,0.25) 50%, transparent 55%),
-        radial-gradient(1px 1px at 70% 75%, rgba(200,220,255,0.15) 50%, transparent 55%),
-        radial-gradient(1.4px 1.4px at 85% 72%, rgba(255,240,200,0.22) 50%, transparent 55%),
-
-        /* === НИЖНЯЯ ЧАСТЬ (ещё тусклее) === */
-        radial-gradient(1px 1px at 5% 85%, rgba(255,255,255,0.12) 50%, transparent 55%),
-        radial-gradient(1.2px 1.2px at 25% 80%, rgba(200,220,255,0.15) 50%, transparent 55%),
-        radial-gradient(1px 1px at 45% 85%, rgba(255,240,200,0.1) 50%, transparent 55%),
-        radial-gradient(1.3px 1.3px at 65% 82%, rgba(255,255,255,0.14) 50%, transparent 55%),
-        radial-gradient(1px 1px at 80% 88%, rgba(180,200,255,0.12) 50%, transparent 55%),
-        radial-gradient(1.1px 1.1px at 90% 80%, rgba(255,255,200,0.1) 50%, transparent 55%);
+        /* === СКОПЛЕНИЕ 1 === */
+        radial-gradient(1.1px 1.1px at 12% 8%, rgba(255,255,255,0.45) 50%, transparent 55%),
+        radial-gradient(0.9px 0.9px at 15% 11%, rgba(255,240,200,0.38) 50%, transparent 55%),
+        radial-gradient(0.6px 0.6px at 9% 14%, rgba(200,220,255,0.25) 50%, transparent 55%),
+        radial-gradient(1.25px 1.25px at 18% 6%, rgba(255,255,255,0.42) 50%, transparent 55%),
+        radial-gradient(0.75px 0.75px at 21% 9%, rgba(255,255,200,0.35) 50%, transparent 55%),
+        radial-gradient(0.5px 0.5px at 14% 13%, rgba(180,200,255,0.18) 50%, transparent 55%),
+        /* === СКОПЛЕНИЕ 2 === */
+        radial-gradient(1px 1px at 65% 12%, rgba(255,255,255,0.48) 50%, transparent 55%),
+        radial-gradient(1.15px 1.15px at 68% 8%, rgba(200,220,255,0.4) 50%, transparent 55%),
+        radial-gradient(0.8px 0.8px at 62% 15%, rgba(255,240,200,0.32) 50%, transparent 55%),
+        radial-gradient(0.6px 0.6px at 71% 10%, rgba(255,255,255,0.22) 50%, transparent 55%),
+        radial-gradient(1.4px 1.4px at 75% 5%, rgba(255,255,200,0.45) 50%, transparent 55%),
+        radial-gradient(0.5px 0.5px at 66% 18%, rgba(180,200,255,0.16) 50%, transparent 55%),
+        /* === СКОПЛЕНИЕ 3 === */
+        radial-gradient(1px 1px at 35% 5%, rgba(255,255,255,0.5) 50%, transparent 55%),
+        radial-gradient(0.9px 0.9px at 38% 9%, rgba(200,220,255,0.38) 50%, transparent 55%),
+        radial-gradient(0.7px 0.7px at 32% 11%, rgba(255,240,200,0.3) 50%, transparent 55%),
+        radial-gradient(1.1px 1.1px at 42% 7%, rgba(255,255,255,0.44) 50%, transparent 55%),
+        radial-gradient(0.5px 0.5px at 36% 14%, rgba(255,255,200,0.2) 50%, transparent 55%),
+        /* === СКОПЛЕНИЕ 4 === */
+        radial-gradient(1.25px 1.25px at 88% 15%, rgba(255,255,255,0.46) 50%, transparent 55%),
+        radial-gradient(0.8px 0.8px at 91% 10%, rgba(200,220,255,0.35) 50%, transparent 55%),
+        radial-gradient(0.6px 0.6px at 85% 18%, rgba(255,240,200,0.25) 50%, transparent 55%),
+        radial-gradient(1px 1px at 94% 12%, rgba(255,255,255,0.4) 50%, transparent 55%),
+        radial-gradient(0.5px 0.5px at 89% 20%, rgba(180,200,255,0.15) 50%, transparent 55%),
+        /* === РАССЕЯННЫЕ ЗВЁЗДЫ === */
+        radial-gradient(0.75px 0.75px at 5% 22%, rgba(255,255,255,0.3) 50%, transparent 55%),
+        radial-gradient(0.6px 0.6px at 25% 30%, rgba(200,220,255,0.22) 50%, transparent 55%),
+        radial-gradient(0.9px 0.9px at 45% 22%, rgba(255,240,200,0.28) 50%, transparent 55%),
+        radial-gradient(0.7px 0.7px at 55% 30%, rgba(255,255,255,0.25) 50%, transparent 55%),
+        radial-gradient(0.5px 0.5px at 70% 28%, rgba(180,200,255,0.18) 50%, transparent 55%),
+        radial-gradient(0.8px 0.8px at 80% 25%, rgba(255,255,200,0.3) 50%, transparent 55%),
+        radial-gradient(0.65px 0.65px at 10% 40%, rgba(255,255,255,0.22) 50%, transparent 55%),
+        radial-gradient(0.75px 0.75px at 30% 42%, rgba(200,220,255,0.26) 50%, transparent 55%),
+        radial-gradient(0.6px 0.6px at 50% 38%, rgba(255,240,200,0.2) 50%, transparent 55%),
+        radial-gradient(0.9px 0.9px at 65% 42%, rgba(255,255,255,0.28) 50%, transparent 55%),
+        radial-gradient(0.5px 0.5px at 85% 48%, rgba(180,200,255,0.16) 50%, transparent 55%),
+        radial-gradient(0.7px 0.7px at 20% 55%, rgba(255,255,200,0.24) 50%, transparent 55%),
+        radial-gradient(0.6px 0.6px at 40% 60%, rgba(255,255,255,0.2) 50%, transparent 55%),
+        radial-gradient(0.8px 0.8px at 60% 55%, rgba(200,220,255,0.25) 50%, transparent 55%),
+        radial-gradient(0.5px 0.5px at 75% 60%, rgba(255,240,200,0.18) 50%, transparent 55%),
+        radial-gradient(0.65px 0.65px at 90% 55%, rgba(255,255,255,0.22) 50%, transparent 55%),
+        radial-gradient(0.75px 0.75px at 15% 70%, rgba(180,200,255,0.2) 50%, transparent 55%),
+        radial-gradient(0.6px 0.6px at 35% 75%, rgba(255,255,200,0.18) 50%, transparent 55%),
+        radial-gradient(0.9px 0.9px at 55% 70%, rgba(255,255,255,0.25) 50%, transparent 55%),
+        radial-gradient(0.5px 0.5px at 70% 75%, rgba(200,220,255,0.15) 50%, transparent 55%),
+        radial-gradient(0.7px 0.7px at 85% 72%, rgba(255,240,200,0.22) 50%, transparent 55%),
+        /* === НИЖНИЕ ТУСКЛЫЕ === */
+        radial-gradient(0.5px 0.5px at 5% 85%, rgba(255,255,255,0.12) 50%, transparent 55%),
+        radial-gradient(0.6px 0.6px at 25% 80%, rgba(200,220,255,0.15) 50%, transparent 55%),
+        radial-gradient(0.5px 0.5px at 45% 85%, rgba(255,240,200,0.1) 50%, transparent 55%),
+        radial-gradient(0.65px 0.65px at 65% 82%, rgba(255,255,255,0.14) 50%, transparent 55%),
+        radial-gradient(0.5px 0.5px at 80% 88%, rgba(180,200,255,0.12) 50%, transparent 55%),
+        radial-gradient(0.55px 0.55px at 90% 80%, rgba(255,255,200,0.1) 50%, transparent 55%);
 
     background-size: 100% 100%;
     background-repeat: no-repeat;
@@ -117,7 +118,7 @@ body::after {
     100% { opacity: 1; }
 }
 
-/* ===== МЕТЕОРНЫЙ СЛОЙ ===== */
+/* ===== МЕТЕОРНЫЙ СЛОЙ (не трогайте, если не надо) ===== */
 #meteorLayer {
     position: fixed;
     inset: 0;
@@ -129,13 +130,7 @@ body::after {
 .meteor {
     position: absolute;
     width: 0.5px;
-    background: linear-gradient(
-        180deg,
-        rgba(255,255,255,0) 0%,      /* хвост (вверху) */
-        rgba(255,235,150,0.2) 40%,
-        rgba(255,235,150,0.5) 75%,
-        #fff5b0 100%                 /* яркая голова (внизу) */
-    );
+    background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,235,150,0.2) 40%, rgba(255,235,150,0.5) 75%, #fff5b0 100%);
     opacity: 0;
     border-radius: 1px;
     box-shadow: 0 0 4px rgba(255,235,150,0.2);
@@ -144,20 +139,19 @@ body::after {
     backface-visibility: hidden;
 }
 
-/* fallback-анимация */
 @keyframes meteorRun {
     0% { transform: rotate(var(--rot)) translate3d(0,0,0); opacity: 0; }
     10% { opacity: var(--op); }
     100% { transform: rotate(var(--rot)) translate3d(0, var(--dy), 0); opacity: 0; }
 }
 
-/* ===== СКАЙЛАЙН ===== */
+/* ===== СКАЙЛАЙН (бегущая линия) — толщина задаётся в :root выше ===== */
 .skyline {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
-    height: 2px;
+    height: var(--skyline-height);  /* ★ здесь меняется толщина (1px) ★ */
     background: linear-gradient(90deg, transparent, #ffeb3b, transparent);
     z-index: 10000;
     pointer-events: none;
@@ -169,7 +163,7 @@ body::after {
     100% { transform: translateX(100%); }
 }
 
-/* ===== ОСНОВНЫЕ ЭЛЕМЕНТЫ (ИНТЕРФЕЙС) ===== */
+/* ===== ОСНОВНЫЕ ЭЛЕМЕНТЫ ИНТЕРФЕЙСА ===== */
 #chatMessages{
     position:fixed;
     top:10px;
@@ -251,7 +245,7 @@ body::after {
     align-items:center;
     gap:8px;
     z-index:20;
-    padding-top: 5px;   /* отступ от поля ввода */
+    padding-top:5px;
 }
 
 #pathDisplay{
@@ -263,39 +257,41 @@ body::after {
     letter-spacing:0.01em;
     font-style: italic;
     margin-right:auto;
-    z-index: 2;
+    z-index:2;
 }
 
 #rightGroup{
     margin-left:auto;
     display:flex;
     align-items:center;
-    gap:5px;            /* увеличенный отступ между группами */
+    gap:5px;
     flex-shrink:0;
     min-width:0;
-    z-index: 2;
+    z-index:2;
 }
 
 #publicControls{
     display:none;
     align-items:center;
-    gap:5px;            /* увеличенный отступ */
+    gap:5px;
 }
 
-#publicControls button{
+/* ★ ПОМЕТКА: СТИЛИ КНОПОК (скругление задаётся переменной --button-border-radius) ★ */
+#publicControls button,
+#adminControls select,
+#adminControls button {
     background:rgba(255,255,255,0.08);
     color:#fff;
-    border:1px solid rgba(255,255,255,0.18);  /* белая рамка по умолчанию */
-    border-radius:2px;
+    border:1px solid rgba(255,255,255,0.18);
+    border-radius: var(--button-border-radius);  /* ★ здесь применяется скругление 4px ★ */
     font-family:'Inter',system-ui,sans-serif;
     font-size:10px;
     font-style: italic;
     font-weight:500;
     letter-spacing:0.02em;
     backdrop-filter:blur(4px);
-    -webkit-backdrop-filter:blur(4px);
     transition:all 0.2s;
-    height:21px;        /* уменьшена высота */
+    height:21px;
     min-height:21px;
     padding:0 7px;
     min-width:42px;
@@ -306,15 +302,17 @@ body::after {
     cursor:pointer;
 }
 
-#publicControls button:hover{
+#publicControls button:hover,
+#adminControls select:hover,
+#adminControls button:hover{
     background:rgba(255,235,59,0.08);
-    border-color:#ffeb3b;   /* жёлтая рамка при наведении */
+    border-color:#ffeb3b;
 }
 
 #adminControls{
     display:none;
     align-items:center;
-    gap:5px;            /* увеличенный отступ */
+    gap:5px;
     min-width:0;
     flex:0 1 auto;
     overflow-x:auto;
@@ -325,63 +323,19 @@ body::after {
     display:none;
 }
 
-#adminControls select,
-#adminControls button{
-    background:rgba(255,255,255,0.08);
-    color:#fff;
-    border:1px solid rgba(255,255,255,0.18);  /* белая рамка по умолчанию */
-    border-radius:2px;
-    font-family:'Inter',system-ui,sans-serif;
-    font-size:10px;
-    font-style: italic;
-    font-weight:500;
-    letter-spacing:0.02em;
-    backdrop-filter:blur(4px);
-    -webkit-backdrop-filter:blur(4px);
-    transition:all 0.2s;
-    vertical-align:middle;
-    margin:0;
-}
-
-#adminControls button{
-    height:21px;        /* уменьшена высота */
-    min-height:21px;
-    padding:0 7px;
-    min-width:42px;
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    line-height:1;
-    cursor:pointer;
-}
-
-/* ★ ИСПРАВЛЕННЫЙ СЕЛЕКТ СЕССИЙ ★ */
+/* Стили селекта (наследует те же border-radius и отступы) */
 #adminControls select{
-    height:21px;
-    min-height:21px;
-    width:90px;                  /* увеличена ширина */
-    min-width:90px;
-    max-width:90px;
-    padding:0 8px 0 6px;         /* отступы для текста */
-    text-align-last:center;
+    width: auto;            /* ширина по содержимому */
+    min-width:42px;
+    padding:0 7px;
     line-height:19px;
-    background:rgba(255,255,255,0.08);
-    backdrop-filter:blur(4px);
-    appearance: none;            /* убираем стандартную стрелку */
+    appearance: none;
     -webkit-appearance: none;
-    -moz-appearance: none;
-    cursor: pointer;
+    text-align: center;
 }
 
-/* Убираем стандартную стрелку в IE */
 #adminControls select::-ms-expand {
     display: none;
-}
-
-#adminControls select:hover,
-#adminControls button:hover{
-    background:rgba(255,235,59,0.08);
-    border-color:#ffeb3b;   /* жёлтая рамка при наведении */
 }
 
 #modelDock{
@@ -530,11 +484,12 @@ body::after {
     font-style: italic;
 }
 
+/* ===== МОБИЛЬНАЯ АДАПТАЦИЯ ===== */
 @media (max-width:720px){
     #bottomBar{
         gap:6px;
         align-items:center;
-        padding-top: 5px;
+        padding-top:5px;
     }
 
     #pathDisplay{
@@ -549,50 +504,23 @@ body::after {
         min-width:0;
     }
 
-    #publicControls{
-        gap:5px;
-    }
-
-    #publicControls button{
-        height:19px;        /* уменьшена высота для мобильных */
-        min-height:19px;
-        padding:0 5px;
-        min-width:38px;
-        font-size:9px;
-    }
-
-    #adminControls{
-        gap:5px;
-        overflow-x:auto;
-    }
-
+    #publicControls button,
     #adminControls select,
     #adminControls button{
-        font-size:9px;
-    }
-
-    #adminControls button{
-        height:19px;        /* уменьшена высота */
+        height:19px;
         min-height:19px;
         padding:0 5px;
         min-width:38px;
+        font-size:9px;
+        border-radius: var(--button-border-radius); /* и на мобильных то же скругление */
     }
 
-    /* ★ МОБИЛЬНАЯ ВЕРСИЯ СЕЛЕКТА ★ */
     #adminControls select{
-        height:19px;
-        min-height:19px;
-        width:80px;                  /* немного уже, но текст влезает */
-        min-width:80px;
-        max-width:80px;
-        padding:0 6px 0 4px;
+        width: auto;
+        min-width:38px;
+        padding:0 5px;
         line-height:17px;
-        appearance: none;
-        -webkit-appearance: none;
-    }
-
-    #adminControls select::-ms-expand {
-        display: none;
+        text-align:center;
     }
 
     #modelDock{
@@ -649,10 +577,10 @@ body::after {
 </head>
 <body>
 
-<!-- Метеорный слой (динамический) -->
+<!-- Метеорный слой -->
 <div id="meteorLayer" aria-hidden="true"></div>
 
-<!-- Бегущий скайлайн -->
+<!-- Бегущий скайлайн (толщина задаётся в :root) -->
 <div class="skyline"></div>
 
 <div id="chatMessages"></div>
@@ -661,13 +589,11 @@ body::after {
 
 <div id="bottomBar">
   <div id="pathDisplay">~/projects/pi-ru</div>
-
   <div id="rightGroup">
     <div id="publicControls">
       <button id="publicUndoBtn" type="button">undo</button>
       <button id="publicRedoBtn" type="button">redo</button>
     </div>
-
     <div id="adminControls">
       <select id="sessionSelect"></select>
       <button id="undoBtn" type="button">undo</button>
@@ -675,7 +601,6 @@ body::after {
       <button id="clearBtn" type="button">clear</button>
       <button id="refreshBtn" type="button">refresh</button>
     </div>
-
     <div id="modelDock">
       <div id="modelCurrent"></div>
       <div id="modelDropdown"></div>
@@ -686,47 +611,36 @@ body::after {
 <div id="fullscreenZone"><span>FULL</span></div>
 
 <script>
+// ========== JavaScript чата (не требует правок для внешнего вида) ==========
 (function() {
-    // ===== УЛУЧШЕННЫЙ МЕТЕОРНЫЙ ДОЖДЬ =====
+    // Метеоры
     const layer = document.getElementById('meteorLayer');
     if (layer) {
         const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
         if (!reduceMotion) {
             let disposed = false;
             let timer = null;
-
             const rand = (min, max) => Math.random() * (max - min) + min;
             const randi = (min, max) => Math.floor(rand(min, max + 1));
-
             const spawnOne = () => {
                 if (disposed) return;
-
                 const vw = window.innerWidth || 1;
                 const vh = window.innerHeight || 1;
-
                 const el = document.createElement('div');
                 el.className = 'meteor';
-
-                // Угол: из правого верхнего в левый нижний
                 const baseAngle = rand(25, 55);
                 const rot = baseAngle + rand(-8, 8);
-
                 const startX = rand(0.65, 0.95) * vw;
                 const startY = rand(-0.15, 0.10) * vh;
-
                 el.style.left = startX.toFixed(1) + 'px';
                 el.style.top = startY.toFixed(1) + 'px';
                 el.style.height = randi(200, 350) + 'px';
-
                 layer.appendChild(el);
                 void el.offsetHeight;
-
                 const dur = randi(800, 2500);
                 const dy = (dur / 1500) * rand(1.2, 1.8) * vh;
-                const op = rand(0.35, 0.55);   // приглушённая яркость
-
+                const op = rand(0.35, 0.55);
                 const cleanup = () => { if (el.isConnected) el.remove(); };
-
                 try {
                     const rotStr = rot.toFixed(1) + 'deg';
                     const anim = el.animate([
@@ -744,17 +658,12 @@ body::after {
                     el.style.animationTimingFunction = 'linear';
                     el.style.animationFillMode = 'forwards';
                 }
-
                 setTimeout(cleanup, dur + 2000);
             };
-
             const spawn = () => {
                 spawnOne();
-                if (Math.random() < 0.15) {
-                    setTimeout(() => spawnOne(), randi(80, 250));
-                }
+                if (Math.random() < 0.15) setTimeout(() => spawnOne(), randi(80, 250));
             };
-
             const schedule = (immediate = false) => {
                 if (disposed) return;
                 if (timer) clearTimeout(timer);
@@ -765,17 +674,13 @@ body::after {
                     schedule(false);
                 }, nextIn);
             };
-
             const onVisibility = () => { if (!document.hidden) schedule(true); };
             const onFullscreen = () => schedule(true);
             const onResize = () => schedule(true);
-
             document.addEventListener('visibilitychange', onVisibility);
             document.addEventListener('fullscreenchange', onFullscreen);
             window.addEventListener('resize', onResize);
-
             schedule(true);
-
             window.__meteorCleanup = () => {
                 disposed = true;
                 if (timer) clearTimeout(timer);
@@ -787,7 +692,7 @@ body::after {
         }
     }
 
-    // ===== ЧАТ-ИНТЕРФЕЙС (С ИСПРАВЛЕНИЯМИ) =====
+    // Чат
     const rawAlias = location.search.length > 1 ? decodeURIComponent(location.search.slice(1)) : '';
     const ADMIN_HEADER = rawAlias;
     const MODEL_LABEL_STORAGE_KEY = 'pi_last_model_label';
@@ -821,7 +726,6 @@ body::after {
     let models = [];
     let poller = null;
     let isSending = false;
-
     let clearConfirmArmed = false;
     let clearConfirmTimer = null;
 
@@ -829,18 +733,11 @@ body::after {
       let s = String(name || '').trim();
       if (s.includes('·')) s = s.split('·').pop().trim();
       if (s.includes('/')) s = s.split('/').pop().trim();
-      s = s
-        .replace(/^openrouter\s*[:·-]?\s*/i, '')
-        .replace(/^open router\s*[:·-]?\s*/i, '')
-        .replace(/^groq\s*[:·-]?\s*/i, '')
-        .replace(/^meta[- ]llama\s*[:·-]?\s*/i, '')
-        .replace(/^meta\s*[:·-]?\s*/i, '')
-        .replace(/^openai\s*[:·-]?\s*/i, '')
-        .replace(/^google\s*[:·-]?\s*/i, '')
-        .replace(/^anthropic\s*[:·-]?\s*/i, '')
-        .replace(/^moonshotai\s*[:·-]?\s*/i, '')
-        .replace(/^moonshot\s*[:·-]?\s*/i, '')
-        .trim();
+      s = s.replace(/^openrouter\s*[:·-]?\s*/i, '').replace(/^open router\s*[:·-]?\s*/i, '')
+           .replace(/^groq\s*[:·-]?\s*/i, '').replace(/^meta[- ]llama\s*[:·-]?\s*/i, '')
+           .replace(/^meta\s*[:·-]?\s*/i, '').replace(/^openai\s*[:·-]?\s*/i, '')
+           .replace(/^google\s*[:·-]?\s*/i, '').replace(/^anthropic\s*[:·-]?\s*/i, '')
+           .replace(/^moonshotai\s*[:·-]?\s*/i, '').replace(/^moonshot\s*[:·-]?\s*/i, '').trim();
       return s;
     }
 
@@ -901,7 +798,6 @@ body::after {
     }
 
     function currentModelLabel(provider, name) { return compactModelName(name, 18); }
-
     function dropdownModelLabel(provider, name) {
       let fullName = humanModelName(name);
       let shortProvider = providerShort(provider);
@@ -920,7 +816,6 @@ body::after {
       modelCurrent.textContent = safe;
       localStorage.setItem(MODEL_LABEL_STORAGE_KEY, safe);
     }
-
     function seedModelLabelFromStorage() {
       const saved = localStorage.getItem(MODEL_LABEL_STORAGE_KEY);
       modelCurrent.textContent = saved || currentModel.label || 'model';
@@ -955,7 +850,6 @@ body::after {
       if (clearConfirmTimer) clearTimeout(clearConfirmTimer);
       clearConfirmTimer = setTimeout(() => disarmClearButton(), 900);
     }
-
     function disarmClearButton() {
       clearConfirmArmed = false;
       clearBtn.textContent = 'clear';
@@ -964,7 +858,6 @@ body::after {
       if (clearConfirmTimer) { clearTimeout(clearConfirmTimer); clearConfirmTimer = null; }
     }
 
-    // Функция для преобразования slot1 -> session 1
     function prettySessionLabel(s) {
       const raw = String(s || '').trim();
       const m = /^slot\s*(\d+)$/i.exec(raw) || /^slot(\d+)$/i.exec(raw);
@@ -1074,7 +967,1106 @@ body::after {
       for (const s of state.sessions) {
         const opt = document.createElement('option');
         opt.value = s;
-        opt.textContent = prettySessionLabel(s);   // <-- преобразование slot1 -> session 1
+        opt.textContent = prettySessionLabel(s);
+        if (s === currentSession) opt.selected = true;
+        sessionSelect.appendChild(opt);
+      }
+      renderModelDock();
+      await loadHistory();
+    }
+
+    async function loadHistory() {
+      if (adminMode) {
+        const data = await api('POST', '/admin/history', {session: currentSession}, true);
+        renderHistory(data.history || []);
+      } else {
+        const data = await api('POST', '/history', {});
+        renderHistory(data.history || []);
+      }
+    }
+
+    function showError(msg) {
+      const wrap = document.createElement('div'); wrap.className = 'msgWrap';
+      const msgDiv = document.createElement('div'); msgDiv.className = 'msg assistant';
+      msgDiv.style.color = '#ff8a8a'; msgDiv.style.whiteSpace = 'pre-wrap';
+      msgDiv.textContent = 'Ошибка: ' + msg;
+      wrap.appendChild(msgDiv); chatDiv.appendChild(wrap);
+      chatDiv.scrollTop = chatDiv.scrollHeight;
+    }
+
+    async function sendMessage() {
+      const text = input.value.trim();
+      if (!text || isSending) return;
+      isSending = true;
+      input.value = '';
+      autoResize();
+      setThinking(true);
+      sendLabel.style.pointerEvents = 'none';
+      try {
+        if (adminMode) {
+          const data = await api('POST', '/admin/chat', { session: currentSession, message: text }, true);
+          await loadHistory(); await syncGlobalModel();
+          if (data.changed) setTimeout(() => location.reload(), 250);
+        } else {
+          const data = await api('POST', '/chat', { message: text });
+          await loadHistory(); await syncGlobalModel();
+          if (data.changed) setTimeout(() => location.reload(), 250);
+        }
+      } catch (e) {
+        console.error(e);
+        showError(e.message);
+      } finally {
+        isSending = false;
+        sendLabel.style.pointerEvents = '';
+        setThinking(false);
+      }
+    }
+
+    function startPolling() {
+      if (poller) clearInterval(poller);
+      poller = setInterval(async () => {
+        try { await loadHistory(); await syncGlobalModel(); } catch (_) {}
+      }, 2500);
+    }
+
+    sendLabel.onclick = sendMessage;
+    input.addEventListener('input', autoResize);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    });
+    sessionSelect.addEventListener('change', async () => {
+      currentSession = sessionSelect.value;
+      localStorage.setItem('pi_admin_target_session', currentSession);
+      disarmClearButton();
+      await loadHistory();
+    });
+    undoBtn.onclick = async () => {
+      try { disarmClearButton(); await api('POST', '/admin/undo', {session: currentSession}, true); location.reload(); }
+      catch (e) { showError(e.message || 'Undo failed'); }
+    };
+    redoBtn.onclick = async () => {
+      try { disarmClearButton(); await api('POST', '/admin/redo', {session: currentSession}, true); location.reload(); }
+      catch (e) { showError(e.message || 'Redo failed'); }
+    };
+    publicUndoBtn.onclick = async () => {
+      try { await api('POST', '/undo', {}); location.reload(); }
+      catch (e) { showError(e.message || 'Undo failed'); }
+    };
+    publicRedoBtn.onclick = async () => {
+      try { await api('POST', '/redo', {}); location.reload(); }
+      catch (e) { showError(e.message || 'Redo failed'); }
+    };
+    clearBtn.onclick = async () => {
+      try {
+        if (!clearConfirmArmed) { armClearButton(); return; }
+        disarmClearButton();
+        await api('POST', '/admin/clear_session', {session: currentSession}, true);
+        await loadHistory();
+      } catch (e) { showError(e.message || 'Clear failed'); }
+    };
+    refreshBtn.onclick = () => { disarmClearButton(); location.reload(); };
+    modelCurrent.onclick = (e) => {
+      e.stopPropagation();
+      if (!adminMode) return;
+      modelDropdown.style.display = modelDropdown.style.display === 'block' ? 'none' : 'block';
+    };
+    document.addEventListener('click', () => { modelDropdown.style.display = 'none'; });
+    fsZone.addEventListener('click', () => {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+      else document.exitFullscreen();
+    });
+
+    (async function init() {
+      try {
+        seedModelLabelFromStorage();
+        if (rawAlias.includes('-admin-')) await loadAdmin();
+        else await loadPublic();
+        startPolling();
+        autoResize();
+        input.focus();
+      } catch (e) {
+        console.error(e);
+        chatDiv.innerHTML = '';
+        showError('Ошибка запуска интерфейса: ' + (e.message || 'Неизвестная ошибка'));
+      }
+    })();
+
+    window.addEventListener('beforeunload', () => {
+      if (window.__meteorCleanup) window.__meteorCleanup();
+    });
+})();
+</script>
+</body>
+</html><!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+<title>~/projects/pi-ru</title>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&display=swap');
+
+/* ======================================================= */
+/* === ПОМЕТКА: ГЛОБАЛЬНЫЕ НАСТРОЙКИ (меняйте здесь) === */
+/* ======================================================= */
+:root{
+    --dock-right-pad:8px;          /* отступ текста модели от правого края */
+    --button-border-radius: 4px;    /* ★ скругление кнопок и селекта (было 2px) ★ */
+    --skyline-height: 1px;          /* ★ толщина бегущей линии (было 2px) ★ */
+}
+
+*{
+    box-sizing:border-box;
+}
+
+html, body{
+    margin:0;
+    padding:0;
+    height:100dvh;
+}
+
+/* ===== НОЧНОЕ НЕБО ===== */
+body{
+    background: linear-gradient(180deg, #050914 0%, #1a2333 70%, #2a3a4a 100%);
+    color:#fff;
+    font-family:'Inter',system-ui,sans-serif;
+    font-style: italic;
+    font-weight:400;
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+    position: relative;
+}
+
+/* ★ ПОМЕТКА: ЗВЁЗДЫ — размеры уменьшены в ~2 раза (было 2.2px → 1.1px и т.д.) ★ */
+/* Чтобы изменить яркость или размер — меняйте значения в radial-gradient(1.1px 1.1px ...) */
+body::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+    background-image: 
+        /* === СКОПЛЕНИЕ 1 === */
+        radial-gradient(1.1px 1.1px at 12% 8%, rgba(255,255,255,0.45) 50%, transparent 55%),
+        radial-gradient(0.9px 0.9px at 15% 11%, rgba(255,240,200,0.38) 50%, transparent 55%),
+        radial-gradient(0.6px 0.6px at 9% 14%, rgba(200,220,255,0.25) 50%, transparent 55%),
+        radial-gradient(1.25px 1.25px at 18% 6%, rgba(255,255,255,0.42) 50%, transparent 55%),
+        radial-gradient(0.75px 0.75px at 21% 9%, rgba(255,255,200,0.35) 50%, transparent 55%),
+        radial-gradient(0.5px 0.5px at 14% 13%, rgba(180,200,255,0.18) 50%, transparent 55%),
+        /* === СКОПЛЕНИЕ 2 === */
+        radial-gradient(1px 1px at 65% 12%, rgba(255,255,255,0.48) 50%, transparent 55%),
+        radial-gradient(1.15px 1.15px at 68% 8%, rgba(200,220,255,0.4) 50%, transparent 55%),
+        radial-gradient(0.8px 0.8px at 62% 15%, rgba(255,240,200,0.32) 50%, transparent 55%),
+        radial-gradient(0.6px 0.6px at 71% 10%, rgba(255,255,255,0.22) 50%, transparent 55%),
+        radial-gradient(1.4px 1.4px at 75% 5%, rgba(255,255,200,0.45) 50%, transparent 55%),
+        radial-gradient(0.5px 0.5px at 66% 18%, rgba(180,200,255,0.16) 50%, transparent 55%),
+        /* === СКОПЛЕНИЕ 3 === */
+        radial-gradient(1px 1px at 35% 5%, rgba(255,255,255,0.5) 50%, transparent 55%),
+        radial-gradient(0.9px 0.9px at 38% 9%, rgba(200,220,255,0.38) 50%, transparent 55%),
+        radial-gradient(0.7px 0.7px at 32% 11%, rgba(255,240,200,0.3) 50%, transparent 55%),
+        radial-gradient(1.1px 1.1px at 42% 7%, rgba(255,255,255,0.44) 50%, transparent 55%),
+        radial-gradient(0.5px 0.5px at 36% 14%, rgba(255,255,200,0.2) 50%, transparent 55%),
+        /* === СКОПЛЕНИЕ 4 === */
+        radial-gradient(1.25px 1.25px at 88% 15%, rgba(255,255,255,0.46) 50%, transparent 55%),
+        radial-gradient(0.8px 0.8px at 91% 10%, rgba(200,220,255,0.35) 50%, transparent 55%),
+        radial-gradient(0.6px 0.6px at 85% 18%, rgba(255,240,200,0.25) 50%, transparent 55%),
+        radial-gradient(1px 1px at 94% 12%, rgba(255,255,255,0.4) 50%, transparent 55%),
+        radial-gradient(0.5px 0.5px at 89% 20%, rgba(180,200,255,0.15) 50%, transparent 55%),
+        /* === РАССЕЯННЫЕ ЗВЁЗДЫ === */
+        radial-gradient(0.75px 0.75px at 5% 22%, rgba(255,255,255,0.3) 50%, transparent 55%),
+        radial-gradient(0.6px 0.6px at 25% 30%, rgba(200,220,255,0.22) 50%, transparent 55%),
+        radial-gradient(0.9px 0.9px at 45% 22%, rgba(255,240,200,0.28) 50%, transparent 55%),
+        radial-gradient(0.7px 0.7px at 55% 30%, rgba(255,255,255,0.25) 50%, transparent 55%),
+        radial-gradient(0.5px 0.5px at 70% 28%, rgba(180,200,255,0.18) 50%, transparent 55%),
+        radial-gradient(0.8px 0.8px at 80% 25%, rgba(255,255,200,0.3) 50%, transparent 55%),
+        radial-gradient(0.65px 0.65px at 10% 40%, rgba(255,255,255,0.22) 50%, transparent 55%),
+        radial-gradient(0.75px 0.75px at 30% 42%, rgba(200,220,255,0.26) 50%, transparent 55%),
+        radial-gradient(0.6px 0.6px at 50% 38%, rgba(255,240,200,0.2) 50%, transparent 55%),
+        radial-gradient(0.9px 0.9px at 65% 42%, rgba(255,255,255,0.28) 50%, transparent 55%),
+        radial-gradient(0.5px 0.5px at 85% 48%, rgba(180,200,255,0.16) 50%, transparent 55%),
+        radial-gradient(0.7px 0.7px at 20% 55%, rgba(255,255,200,0.24) 50%, transparent 55%),
+        radial-gradient(0.6px 0.6px at 40% 60%, rgba(255,255,255,0.2) 50%, transparent 55%),
+        radial-gradient(0.8px 0.8px at 60% 55%, rgba(200,220,255,0.25) 50%, transparent 55%),
+        radial-gradient(0.5px 0.5px at 75% 60%, rgba(255,240,200,0.18) 50%, transparent 55%),
+        radial-gradient(0.65px 0.65px at 90% 55%, rgba(255,255,255,0.22) 50%, transparent 55%),
+        radial-gradient(0.75px 0.75px at 15% 70%, rgba(180,200,255,0.2) 50%, transparent 55%),
+        radial-gradient(0.6px 0.6px at 35% 75%, rgba(255,255,200,0.18) 50%, transparent 55%),
+        radial-gradient(0.9px 0.9px at 55% 70%, rgba(255,255,255,0.25) 50%, transparent 55%),
+        radial-gradient(0.5px 0.5px at 70% 75%, rgba(200,220,255,0.15) 50%, transparent 55%),
+        radial-gradient(0.7px 0.7px at 85% 72%, rgba(255,240,200,0.22) 50%, transparent 55%),
+        /* === НИЖНИЕ ТУСКЛЫЕ === */
+        radial-gradient(0.5px 0.5px at 5% 85%, rgba(255,255,255,0.12) 50%, transparent 55%),
+        radial-gradient(0.6px 0.6px at 25% 80%, rgba(200,220,255,0.15) 50%, transparent 55%),
+        radial-gradient(0.5px 0.5px at 45% 85%, rgba(255,240,200,0.1) 50%, transparent 55%),
+        radial-gradient(0.65px 0.65px at 65% 82%, rgba(255,255,255,0.14) 50%, transparent 55%),
+        radial-gradient(0.5px 0.5px at 80% 88%, rgba(180,200,255,0.12) 50%, transparent 55%),
+        radial-gradient(0.55px 0.55px at 90% 80%, rgba(255,255,200,0.1) 50%, transparent 55%);
+
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    animation: starTwinkle 6s infinite alternate ease-in-out;
+}
+
+@keyframes starTwinkle {
+    0% { opacity: 0.75; }
+    100% { opacity: 1; }
+}
+
+/* ===== МЕТЕОРНЫЙ СЛОЙ (не трогайте, если не надо) ===== */
+#meteorLayer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    transform: translateZ(0);
+}
+
+.meteor {
+    position: absolute;
+    width: 0.5px;
+    background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,235,150,0.2) 40%, rgba(255,235,150,0.5) 75%, #fff5b0 100%);
+    opacity: 0;
+    border-radius: 1px;
+    box-shadow: 0 0 4px rgba(255,235,150,0.2);
+    will-change: transform, opacity;
+    transform-origin: 50% 0%;
+    backface-visibility: hidden;
+}
+
+@keyframes meteorRun {
+    0% { transform: rotate(var(--rot)) translate3d(0,0,0); opacity: 0; }
+    10% { opacity: var(--op); }
+    100% { transform: rotate(var(--rot)) translate3d(0, var(--dy), 0); opacity: 0; }
+}
+
+/* ===== СКАЙЛАЙН (бегущая линия) — толщина задаётся в :root выше ===== */
+.skyline {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: var(--skyline-height);  /* ★ здесь меняется толщина (1px) ★ */
+    background: linear-gradient(90deg, transparent, #ffeb3b, transparent);
+    z-index: 10000;
+    pointer-events: none;
+    animation: scanlineMove 4s linear infinite;
+}
+
+@keyframes scanlineMove {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* ===== ОСНОВНЫЕ ЭЛЕМЕНТЫ ИНТЕРФЕЙСА ===== */
+#chatMessages{
+    position:fixed;
+    top:10px;
+    left:10px;
+    right:10px;
+    bottom:115px;
+    overflow-y:auto;
+    padding:10px;
+    z-index: 2;
+}
+
+#messageInput{
+    position:fixed;
+    bottom:40px;
+    left:10px;
+    right:10px;
+    max-height:120px;
+    background:transparent;
+    color:#fff;
+    border:none;
+    border-top:1px solid rgba(255,235,59,0.6);
+    border-bottom:1px solid rgba(255,235,59,0.6);
+    font-family:'Inter',system-ui,sans-serif;
+    font-size:14px;
+    letter-spacing:0.02em;
+    padding:8px 12px;
+    height:35px;
+    min-height:35px;
+    outline:none;
+    resize:none;
+    line-height:1.4;
+    overflow-y:auto;
+    font-style: italic;
+    z-index: 2;
+    backdrop-filter: blur(2px);
+}
+
+#messageInput::placeholder{
+    color:rgba(255,255,255,0.15);
+    font-style: italic;
+}
+
+#sendLabel{
+    position:fixed;
+    bottom:46px;
+    right:20px;
+    color:rgba(255,255,255,0.6);
+    font-size:16px;
+    font-weight:500;
+    cursor:pointer;
+    user-select:none;
+    transition:color 0.2s, opacity 0.2s, transform 0.2s;
+    font-style: italic;
+    z-index: 2;
+}
+
+#sendLabel:hover{
+    color:#ffeb3b !important;
+}
+
+#sendLabel.thinking{
+    color:rgba(255,255,255,0.95);
+    animation:pulseSend 1s ease-in-out infinite;
+}
+
+@keyframes pulseSend{
+    0% { opacity:.45; transform:translateY(0px); }
+    50% { opacity:1; transform:translateY(-1px); }
+    100% { opacity:.45; transform:translateY(0px); }
+}
+
+#bottomBar{
+    position:fixed;
+    left:10px;
+    right:10px;
+    bottom:12px;
+    min-height:24px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    z-index:20;
+    padding-top:5px;
+}
+
+#pathDisplay{
+    font-size:15px;
+    opacity:0.42;
+    line-height:1;
+    white-space:nowrap;
+    flex:0 0 auto;
+    letter-spacing:0.01em;
+    font-style: italic;
+    margin-right:auto;
+    z-index:2;
+}
+
+#rightGroup{
+    margin-left:auto;
+    display:flex;
+    align-items:center;
+    gap:5px;
+    flex-shrink:0;
+    min-width:0;
+    z-index:2;
+}
+
+#publicControls{
+    display:none;
+    align-items:center;
+    gap:5px;
+}
+
+/* ★ ПОМЕТКА: СТИЛИ КНОПОК (скругление задаётся переменной --button-border-radius) ★ */
+#publicControls button,
+#adminControls select,
+#adminControls button {
+    background:rgba(255,255,255,0.08);
+    color:#fff;
+    border:1px solid rgba(255,255,255,0.18);
+    border-radius: var(--button-border-radius);  /* ★ здесь применяется скругление 4px ★ */
+    font-family:'Inter',system-ui,sans-serif;
+    font-size:10px;
+    font-style: italic;
+    font-weight:500;
+    letter-spacing:0.02em;
+    backdrop-filter:blur(4px);
+    transition:all 0.2s;
+    height:21px;
+    min-height:21px;
+    padding:0 7px;
+    min-width:42px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    line-height:1;
+    cursor:pointer;
+}
+
+#publicControls button:hover,
+#adminControls select:hover,
+#adminControls button:hover{
+    background:rgba(255,235,59,0.08);
+    border-color:#ffeb3b;
+}
+
+#adminControls{
+    display:none;
+    align-items:center;
+    gap:5px;
+    min-width:0;
+    flex:0 1 auto;
+    overflow-x:auto;
+    scrollbar-width:none;
+}
+
+#adminControls::-webkit-scrollbar{
+    display:none;
+}
+
+/* Стили селекта (наследует те же border-radius и отступы) */
+#adminControls select{
+    width: auto;            /* ширина по содержимому */
+    min-width:42px;
+    padding:0 7px;
+    line-height:19px;
+    appearance: none;
+    -webkit-appearance: none;
+    text-align: center;
+}
+
+#adminControls select::-ms-expand {
+    display: none;
+}
+
+#modelDock{
+    position:relative;
+    flex:0 0 128px;
+    width:128px;
+    min-width:128px;
+    max-width:128px;
+    margin-right:-10px;
+}
+
+#modelCurrent{
+    display:block;
+    width:100%;
+    max-width:100%;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    font-family:'Inter',system-ui,sans-serif;
+    font-size:11px;
+    font-weight:500;
+    opacity:0.68;
+    text-align:right;
+    padding-right:var(--dock-right-pad);
+    cursor:pointer;
+    letter-spacing:0.01em;
+    font-style: italic;
+    user-select:none;
+}
+
+#modelCurrent.admin-clickable{
+    cursor:pointer;
+}
+
+#modelDropdown{
+    display:none;
+    position:absolute;
+    bottom:100%;
+    right:0;
+    background:transparent;
+    backdrop-filter:blur(4px);
+    padding:6px 0 4px 0;
+    z-index:40;
+    white-space:nowrap;
+    max-height:calc(100dvh - 80px);
+    overflow-y:auto;
+    border:none;
+    width:max-content;
+    max-width:360px;
+    margin-bottom:6px;
+}
+
+.model-option{
+    position:relative;
+    padding:7px var(--dock-right-pad) 7px 10px;
+    color:rgba(255,255,255,0.72);
+    font-size:10px;
+    cursor:pointer;
+    white-space:normal;
+    word-break:break-word;
+    font-family:'Inter',system-ui,sans-serif;
+    font-weight:500;
+    font-style: italic;
+    letter-spacing:0.01em;
+    border:none;
+    border-radius:0;
+    transition:background 0.18s, color 0.18s, opacity 0.18s;
+    text-align:right;
+}
+
+.model-option:hover{
+    background:linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.03) 55%, rgba(255,255,255,0.07) 100%);
+    color:rgba(255,255,255,0.9);
+}
+
+.model-option.active{
+    background:linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.04) 48%, rgba(255,255,255,0.1) 100%);
+    color:rgba(255,255,255,0.96);
+}
+
+.model-option.active::after{
+    content:'';
+    position:absolute;
+    top:5px;
+    bottom:5px;
+    right:0;
+    width:1px;
+    background:rgba(255,255,255,0.22);
+}
+
+.msgWrap{
+    margin-bottom:4px;
+}
+
+.msgWrap.adminDeletable{
+    cursor:pointer;
+}
+
+.msgWrap.adminDeletable:hover{
+    outline:1px dashed rgba(255,255,255,0.18);
+}
+
+.msg{
+    margin:0;
+    opacity:0.28;
+    letter-spacing:0.02em;
+    line-height:1.45;
+    word-break:break-word;
+    white-space:pre-wrap;
+    font-size:14px;
+    font-family:'Inter',system-ui,sans-serif;
+    font-style: italic;
+}
+
+.msg.assistant{
+    opacity:1;
+    color:#dceee1;
+}
+
+.msg.user{
+    opacity:0.45;
+    font-size:12px;
+    color:rgba(255,255,255,0.82);
+}
+
+#fullscreenZone{
+    position:fixed;
+    top:5px;
+    right:12px;
+    width:50px;
+    height:50px;
+    z-index:100;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    opacity:0.3;
+}
+
+#fullscreenZone span{
+    font-size:10px;
+    color:rgba(255,255,255,0.2);
+    font-family:'Inter',system-ui,sans-serif;
+    font-weight:500;
+    letter-spacing:0.04em;
+    font-style: italic;
+}
+
+/* ===== МОБИЛЬНАЯ АДАПТАЦИЯ ===== */
+@media (max-width:720px){
+    #bottomBar{
+        gap:6px;
+        align-items:center;
+        padding-top:5px;
+    }
+
+    #pathDisplay{
+        font-size:12px;
+        overflow:visible;
+    }
+
+    #rightGroup{
+        gap:5px;
+        max-width:calc(100vw - 112px);
+        flex-shrink:1;
+        min-width:0;
+    }
+
+    #publicControls button,
+    #adminControls select,
+    #adminControls button{
+        height:19px;
+        min-height:19px;
+        padding:0 5px;
+        min-width:38px;
+        font-size:9px;
+        border-radius: var(--button-border-radius); /* и на мобильных то же скругление */
+    }
+
+    #adminControls select{
+        width: auto;
+        min-width:38px;
+        padding:0 5px;
+        line-height:17px;
+        text-align:center;
+    }
+
+    #modelDock{
+        flex:0 0 108px;
+        width:108px;
+        min-width:108px;
+        max-width:108px;
+        margin-right:-10px;
+    }
+
+    #modelCurrent{
+        max-width:100%;
+        font-size:10px;
+        padding-right:var(--dock-right-pad);
+    }
+
+    .model-option{
+        padding-right:var(--dock-right-pad);
+        white-space:normal;
+        word-break:break-word;
+    }
+
+    #modelDropdown{
+        max-width:92vw;
+    }
+
+    .msg{
+        font-size:13px;
+    }
+
+    .msg.user{
+        font-size:11px;
+    }
+}
+
+::-webkit-scrollbar{
+    width:8px;
+}
+
+::-webkit-scrollbar-track{
+    background:rgb(14,16,22);
+}
+
+::-webkit-scrollbar-thumb{
+    background:rgb(42,48,68);
+    border-radius:4px;
+}
+
+*{
+    scrollbar-width:thin;
+    scrollbar-color:rgb(42,48,68) rgb(14,16,22);
+}
+</style>
+</head>
+<body>
+
+<!-- Метеорный слой -->
+<div id="meteorLayer" aria-hidden="true"></div>
+
+<!-- Бегущий скайлайн (толщина задаётся в :root) -->
+<div class="skyline"></div>
+
+<div id="chatMessages"></div>
+<textarea id="messageInput" rows="1" placeholder="Type message..."></textarea>
+<div id="sendLabel">Send</div>
+
+<div id="bottomBar">
+  <div id="pathDisplay">~/projects/pi-ru</div>
+  <div id="rightGroup">
+    <div id="publicControls">
+      <button id="publicUndoBtn" type="button">undo</button>
+      <button id="publicRedoBtn" type="button">redo</button>
+    </div>
+    <div id="adminControls">
+      <select id="sessionSelect"></select>
+      <button id="undoBtn" type="button">undo</button>
+      <button id="redoBtn" type="button">redo</button>
+      <button id="clearBtn" type="button">clear</button>
+      <button id="refreshBtn" type="button">refresh</button>
+    </div>
+    <div id="modelDock">
+      <div id="modelCurrent"></div>
+      <div id="modelDropdown"></div>
+    </div>
+  </div>
+</div>
+
+<div id="fullscreenZone"><span>FULL</span></div>
+
+<script>
+// ========== JavaScript чата (не требует правок для внешнего вида) ==========
+(function() {
+    // Метеоры
+    const layer = document.getElementById('meteorLayer');
+    if (layer) {
+        const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+        if (!reduceMotion) {
+            let disposed = false;
+            let timer = null;
+            const rand = (min, max) => Math.random() * (max - min) + min;
+            const randi = (min, max) => Math.floor(rand(min, max + 1));
+            const spawnOne = () => {
+                if (disposed) return;
+                const vw = window.innerWidth || 1;
+                const vh = window.innerHeight || 1;
+                const el = document.createElement('div');
+                el.className = 'meteor';
+                const baseAngle = rand(25, 55);
+                const rot = baseAngle + rand(-8, 8);
+                const startX = rand(0.65, 0.95) * vw;
+                const startY = rand(-0.15, 0.10) * vh;
+                el.style.left = startX.toFixed(1) + 'px';
+                el.style.top = startY.toFixed(1) + 'px';
+                el.style.height = randi(200, 350) + 'px';
+                layer.appendChild(el);
+                void el.offsetHeight;
+                const dur = randi(800, 2500);
+                const dy = (dur / 1500) * rand(1.2, 1.8) * vh;
+                const op = rand(0.35, 0.55);
+                const cleanup = () => { if (el.isConnected) el.remove(); };
+                try {
+                    const rotStr = rot.toFixed(1) + 'deg';
+                    const anim = el.animate([
+                        { transform: `rotate(${rotStr}) translate3d(0,0,0)`, opacity: 0 },
+                        { opacity: op, offset: 0.05 },
+                        { transform: `rotate(${rotStr}) translate3d(0, ${dy.toFixed(1)}px, 0)`, opacity: 0 }
+                    ], { duration: dur, easing: 'linear', fill: 'forwards' });
+                    anim.onfinish = cleanup;
+                } catch (e) {
+                    el.style.setProperty('--rot', rot.toFixed(1) + 'deg');
+                    el.style.setProperty('--dy', dy.toFixed(1) + 'px');
+                    el.style.setProperty('--op', String(op));
+                    el.style.animationName = 'meteorRun';
+                    el.style.animationDuration = dur + 'ms';
+                    el.style.animationTimingFunction = 'linear';
+                    el.style.animationFillMode = 'forwards';
+                }
+                setTimeout(cleanup, dur + 2000);
+            };
+            const spawn = () => {
+                spawnOne();
+                if (Math.random() < 0.15) setTimeout(() => spawnOne(), randi(80, 250));
+            };
+            const schedule = (immediate = false) => {
+                if (disposed) return;
+                if (timer) clearTimeout(timer);
+                const nextIn = immediate ? 600 : randi(3000, 18000);
+                timer = setTimeout(() => {
+                    if (disposed) return;
+                    if (!document.hidden) spawn();
+                    schedule(false);
+                }, nextIn);
+            };
+            const onVisibility = () => { if (!document.hidden) schedule(true); };
+            const onFullscreen = () => schedule(true);
+            const onResize = () => schedule(true);
+            document.addEventListener('visibilitychange', onVisibility);
+            document.addEventListener('fullscreenchange', onFullscreen);
+            window.addEventListener('resize', onResize);
+            schedule(true);
+            window.__meteorCleanup = () => {
+                disposed = true;
+                if (timer) clearTimeout(timer);
+                document.removeEventListener('visibilitychange', onVisibility);
+                document.removeEventListener('fullscreenchange', onFullscreen);
+                window.removeEventListener('resize', onResize);
+                layer.innerHTML = '';
+            };
+        }
+    }
+
+    // Чат
+    const rawAlias = location.search.length > 1 ? decodeURIComponent(location.search.slice(1)) : '';
+    const ADMIN_HEADER = rawAlias;
+    const MODEL_LABEL_STORAGE_KEY = 'pi_last_model_label';
+
+    const chatDiv = document.getElementById('chatMessages');
+    const input = document.getElementById('messageInput');
+    const sendLabel = document.getElementById('sendLabel');
+    const pathDisplay = document.getElementById('pathDisplay');
+    const fsZone = document.getElementById('fullscreenZone');
+
+    const adminControls = document.getElementById('adminControls');
+    const publicControls = document.getElementById('publicControls');
+    const sessionSelect = document.getElementById('sessionSelect');
+    const undoBtn = document.getElementById('undoBtn');
+    const redoBtn = document.getElementById('redoBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const publicUndoBtn = document.getElementById('publicUndoBtn');
+    const publicRedoBtn = document.getElementById('publicRedoBtn');
+
+    const modelCurrent = document.getElementById('modelCurrent');
+    const modelDropdown = document.getElementById('modelDropdown');
+
+    let adminMode = false;
+    let currentSession = 'default';
+    let currentModel = {
+      provider: 'groq',
+      model: 'llama-3.1-8b-instant',
+      label: 'llama 3.1 8B'
+    };
+    let models = [];
+    let poller = null;
+    let isSending = false;
+    let clearConfirmArmed = false;
+    let clearConfirmTimer = null;
+
+    function baseModelName(name) {
+      let s = String(name || '').trim();
+      if (s.includes('·')) s = s.split('·').pop().trim();
+      if (s.includes('/')) s = s.split('/').pop().trim();
+      s = s.replace(/^openrouter\s*[:·-]?\s*/i, '').replace(/^open router\s*[:·-]?\s*/i, '')
+           .replace(/^groq\s*[:·-]?\s*/i, '').replace(/^meta[- ]llama\s*[:·-]?\s*/i, '')
+           .replace(/^meta\s*[:·-]?\s*/i, '').replace(/^openai\s*[:·-]?\s*/i, '')
+           .replace(/^google\s*[:·-]?\s*/i, '').replace(/^anthropic\s*[:·-]?\s*/i, '')
+           .replace(/^moonshotai\s*[:·-]?\s*/i, '').replace(/^moonshot\s*[:·-]?\s*/i, '').trim();
+      return s;
+    }
+
+    function humanModelName(name) {
+      let s = baseModelName(name);
+      const directMap = [
+        [/^llama[- ]?3\.1[- ]?8b[- ]?instant$/i, 'llama 3.1 8B'],
+        [/^llama[- ]?3\.1[- ]?70b[- ]?versatile$/i, 'llama 3.1 70B'],
+        [/^llama[- ]?3\.3[- ]?70b[- ]?versatile$/i, 'llama 3.3 70B'],
+        [/^gpt[- ]?4o[- ]?mini$/i, 'GPT-4o mini'],
+        [/^gpt[- ]?4\.?1[- ]?mini$/i, 'GPT-4.1 mini'],
+        [/^gpt[- ]?4\.?1$/i, 'GPT-4.1'],
+        [/^kimi[- ]?k2$/i, 'Kimi K2'],
+        [/^gemini[- ]?2\.0[- ]?flash(?:[- ]?exp)?$/i, 'Gemini 2.0 Flash'],
+        [/^deepseek[- ]?chat(?:[- ]?v?\d+(?:[- ]?\d+)*)?$/i, 'DeepSeek Chat'],
+        [/^deepseek[- ]?r1(?:[- ]?distill)?$/i, 'DeepSeek R1'],
+        [/^claude[- ]?3\.7[- ]?sonnet$/i, 'Claude 3.7 Sonnet'],
+        [/^claude[- ]?3\.5[- ]?sonnet$/i, 'Claude 3.5 Sonnet'],
+        [/^qwen[- ]?2\.5[- ]?72b(?:[- ]?instruct)?$/i, 'Qwen 2.5 72B'],
+        [/^qwen[- ]?2\.5[- ]?32b(?:[- ]?instruct)?$/i, 'Qwen 2.5 32B'],
+        [/^qwen[- ]?2\.5[- ]?14b(?:[- ]?instruct)?$/i, 'Qwen 2.5 14B'],
+        [/^mistral[- ]?small(?:[- ]?\d+(?:\.\d+)?)?$/i, 'Mistral Small']
+      ];
+      for (const [rx, out] of directMap) if (rx.test(s)) return out;
+      s = s.replace(/[_]+/g, '-').replace(/\binstant\b/gi, '').replace(/\binstruct\b/gi, '').replace(/\bversatile\b/gi, '')
+           .replace(/\bpreview\b/gi, '').replace(/\blatest\b/gi, '').replace(/\bonline\b/gi, '').replace(/\bfree\b/gi, '')
+           .replace(/\s+/g, ' ').replace(/-+/g, ' ').trim();
+      if (!s) return 'model';
+      const tokens = s.split(' ').map(t => {
+        const low = t.toLowerCase();
+        if (low === 'gpt') return 'GPT';
+        if (low === 'claude') return 'Claude';
+        if (low === 'gemini') return 'Gemini';
+        if (low === 'kimi') return 'Kimi';
+        if (low === 'qwen') return 'Qwen';
+        if (low === 'deepseek') return 'DeepSeek';
+        if (low === 'mistral') return 'Mistral';
+        if (low === 'grok') return 'Grok';
+        if (low === 'llama') return 'llama';
+        return t;
+      });
+      return tokens.join(' ');
+    }
+
+    function compactModelName(name, maxLen = 18) {
+      let s = humanModelName(name);
+      if (s.length <= maxLen) return s;
+      s = s.replace(/\bChat\b/gi, '').replace(/\bSonnet\b/gi, '').replace(/\s+/g, ' ').trim();
+      if (s.length <= maxLen) return s;
+      return s.slice(0, maxLen - 1).trimEnd() + '…';
+    }
+
+    function providerShort(provider) {
+      const p = String(provider || '').trim().toLowerCase();
+      if (p === 'openrouter') return 'OR';
+      if (p === 'groq') return 'GROQ';
+      return String(provider || '').trim();
+    }
+
+    function currentModelLabel(provider, name) { return compactModelName(name, 18); }
+    function dropdownModelLabel(provider, name) {
+      let fullName = humanModelName(name);
+      let shortProvider = providerShort(provider);
+      let isFree = false;
+      if (name && typeof name === 'string') {
+        let lowerName = name.toLowerCase();
+        if (lowerName.includes('free') || lowerName.includes(':free')) isFree = true;
+      }
+      if (fullName.toLowerCase().includes('free')) isFree = true;
+      return isFree ? `FREE · ${shortProvider}: ${fullName}` : `${shortProvider}: ${fullName}`;
+    }
+
+    function setVisibleModelLabel(label) {
+      const safe = String(label || '').trim();
+      if (!safe) return;
+      modelCurrent.textContent = safe;
+      localStorage.setItem(MODEL_LABEL_STORAGE_KEY, safe);
+    }
+    function seedModelLabelFromStorage() {
+      const saved = localStorage.getItem(MODEL_LABEL_STORAGE_KEY);
+      modelCurrent.textContent = saved || currentModel.label || 'model';
+    }
+
+    function setThinking(v) {
+      sendLabel.classList.toggle('thinking', !!v);
+      sendLabel.textContent = v ? '...' : 'Send';
+    }
+
+    function api(method, url, data=null, admin=false) {
+      const headers = {'Content-Type': 'application/json'};
+      if (admin) headers['X-Admin-Alias'] = ADMIN_HEADER;
+      return fetch(url, { method, headers, body: data ? JSON.stringify(data) : null })
+        .then(async (res) => {
+          const payload = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(payload.error || ('HTTP ' + res.status));
+          return payload;
+        });
+    }
+
+    function autoResize() {
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+    }
+
+    function armClearButton() {
+      clearConfirmArmed = true;
+      clearBtn.textContent = 'sure?';
+      clearBtn.style.background = 'rgba(255,120,120,0.16)';
+      clearBtn.style.borderColor = 'rgba(255,160,160,0.34)';
+      if (clearConfirmTimer) clearTimeout(clearConfirmTimer);
+      clearConfirmTimer = setTimeout(() => disarmClearButton(), 900);
+    }
+    function disarmClearButton() {
+      clearConfirmArmed = false;
+      clearBtn.textContent = 'clear';
+      clearBtn.style.background = '';
+      clearBtn.style.borderColor = '';
+      if (clearConfirmTimer) { clearTimeout(clearConfirmTimer); clearConfirmTimer = null; }
+    }
+
+    function prettySessionLabel(s) {
+      const raw = String(s || '').trim();
+      const m = /^slot\s*(\d+)$/i.exec(raw) || /^slot(\d+)$/i.exec(raw);
+      if (m) return `session ${m[1]}`;
+      return raw;
+    }
+
+    function renderHistory(items) {
+      chatDiv.innerHTML = '';
+      if (!items || !items.length) return;
+      for (const item of items) {
+        const wrap = document.createElement('div');
+        wrap.className = 'msgWrap' + (adminMode ? ' adminDeletable' : '');
+        if (item.id) wrap.dataset.id = item.id;
+        const msg = document.createElement('div');
+        const isUser = item.role === 'user';
+        msg.className = 'msg ' + (isUser ? 'user' : 'assistant');
+        msg.textContent = item.message || item.content || '';
+        wrap.appendChild(msg);
+        if (adminMode && item.id) {
+          wrap.title = 'Double click to delete';
+          wrap.ondblclick = async () => {
+            try { await api('POST', '/admin/delete_message', {id: item.id}, true); await loadHistory(); }
+            catch (e) { console.error(e); }
+          };
+        }
+        chatDiv.appendChild(wrap);
+      }
+      chatDiv.scrollTop = chatDiv.scrollHeight;
+    }
+
+    function renderModelDock() {
+      const rawName = currentModel.model || currentModel.label || '';
+      const label = currentModelLabel(currentModel.provider, rawName);
+      setVisibleModelLabel(label);
+      modelCurrent.title = humanModelName(rawName);
+      modelDropdown.innerHTML = '';
+      if (!adminMode) {
+        modelCurrent.classList.remove('admin-clickable');
+        modelDropdown.style.display = 'none';
+        return;
+      }
+      modelCurrent.classList.add('admin-clickable');
+      const sorted = [...models].sort((a, b) => {
+        const order = { groq: 1, kimi: 2, openrouter: 3 };
+        const pa = a.provider.toLowerCase(), pb = b.provider.toLowerCase();
+        const oa = order[pa] ?? 999, ob = order[pb] ?? 999;
+        if (oa !== ob) return oa - ob;
+        return pa.localeCompare(pb);
+      });
+      for (const m of sorted) {
+        const isActive = m.provider === currentModel.provider && m.model === currentModel.model;
+        const el = document.createElement('div');
+        el.className = 'model-option' + (isActive ? ' active' : '');
+        el.textContent = dropdownModelLabel(m.provider, m.model || m.name || '');
+        el.title = m.model || m.name || '';
+        el.style.whiteSpace = 'normal';
+        el.style.wordBreak = 'break-word';
+        el.onclick = async (e) => {
+          e.stopPropagation();
+          try {
+            const data = await api('POST', '/admin/set_model', { provider: m.provider, model: m.model }, true);
+            currentModel = { provider: data.provider, model: data.model, label: data.label || dropdownModelLabel(data.provider, data.model) };
+            renderModelDock();
+            modelDropdown.style.display = 'none';
+          } catch (e2) { console.error(e2); }
+        };
+        modelDropdown.appendChild(el);
+      }
+    }
+
+    async function syncGlobalModel() {
+      try {
+        const gm = await api('GET', '/global_model');
+        currentModel = { provider: gm.provider, model: gm.model, label: gm.label || (gm.provider + ' / ' + gm.model) };
+        renderModelDock();
+      } catch (_) {}
+    }
+
+    async function loadModels() {
+      try { models = (await api('GET', '/models')).models || []; }
+      catch (_) { models = []; }
+    }
+
+    async function loadPublic() {
+      adminMode = false;
+      adminControls.style.display = 'none';
+      publicControls.style.display = 'flex';
+      pathDisplay.textContent = '~/projects/pi-ru';
+      await syncGlobalModel();
+      await loadHistory();
+    }
+
+    async function loadAdmin() {
+      adminMode = true;
+      adminControls.style.display = 'flex';
+      publicControls.style.display = 'none';
+      pathDisplay.textContent = '~/projects/pi-ru';
+      const state = await api('GET', '/admin/state', null, true);
+      await loadModels();
+      currentModel = state.global_model || currentModel;
+      currentSession = localStorage.getItem('pi_admin_target_session') || 'private';
+      if (!state.sessions.includes(currentSession)) {
+        currentSession = state.sessions.includes('private') ? 'private' : (state.sessions[0] || 'default');
+      }
+      sessionSelect.innerHTML = '';
+      for (const s of state.sessions) {
+        const opt = document.createElement('option');
+        opt.value = s;
+        opt.textContent = prettySessionLabel(s);
         if (s === currentSession) opt.selected = true;
         sessionSelect.appendChild(opt);
       }
