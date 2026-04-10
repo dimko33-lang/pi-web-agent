@@ -4,7 +4,9 @@ import re
 import subprocess
 import shlex
 import time
-from typing import List, Dict, Optional
+import pwd
+from typing import List, Dict
+from datetime import datetime
 
 import requests
 
@@ -70,7 +72,6 @@ class Agent:
         self.default_openrouter_model = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o").strip()
         self.default_kimi_model = os.getenv("KIMI_MODEL", "kimi-k2.5").strip()
 
-        # Увеличиваем таймаут для медленных моделей
         self.timeout = 120
         self.max_retries = 2
 
@@ -100,10 +101,8 @@ class Agent:
         return model or "Unknown"
 
     def model_options(self) -> List[Dict]:
-        """Порядок: GROQ → Kimi → OpenRouter"""
         models = []
 
-        # 1. GROQ
         if self.groq_key:
             try:
                 r = requests.get(
@@ -123,12 +122,10 @@ class Agent:
                     name = self.GROQ_LABELS.get(mid, f"Groq · {mid}")
                     models.append({"name": name, "provider": "groq", "model": mid})
 
-        # 2. Kimi
         if self.kimi_key:
             for name, mid in self.KIMI_MODELS:
                 models.append({"name": f"Kimi · {name}", "provider": "kimi", "model": mid})
 
-        # 3. OpenRouter
         if self.openrouter_key:
             try:
                 r = requests.get("https://openrouter.ai/api/v1/models", timeout=10)
@@ -170,12 +167,8 @@ class Agent:
                 or_models.sort(key=sort_key)
                 for m in or_models:
                     models.append({"name": m["name"], "provider": m["provider"], "model": m["model"]})
-            except Exception as e:
-                print(f"OpenRouter API error: {e}")
-                models.append({"name": "OpenRouter · auto (automatic)", "provider": "openrouter", "model": "openrouter/auto"})
-                models.append({"name": "OpenRouter · free (automatic free tier)", "provider": "openrouter", "model": "openrouter/free"})
-                for name, mid in self.OPENROUTER_FAVORITES:
-                    models.append({"name": f"OpenRouter · {name}", "provider": "openrouter", "model": mid})
+            except Exception:
+                pass
 
         if not models:
             models = [{"name": "Llama 3.1 8B", "provider": "groq", "model": "llama-3.1-8b-instant"}]
@@ -202,7 +195,7 @@ class Agent:
         ok = undo_last_snapshot(session["id"])
         return {
             "success": True,
-            "reply": "Откатил последнее изменение." if ok else "Откатывать нечего.",
+            "reply": "↩️ Откатил последнее изменение." if ok else "ℹ️ Откатывать нечего.",
             "changed": bool(ok),
             "provider": session["provider"],
             "model": session["model"],
@@ -214,7 +207,7 @@ class Agent:
         ok = redo_last_snapshot(session["id"])
         return {
             "success": True,
-            "reply": "Вернул изменение вперёд." if ok else "Возвращать нечего.",
+            "reply": "↪️ Вернул изменение вперёд." if ok else "ℹ️ Возвращать нечего.",
             "changed": bool(ok),
             "provider": session["provider"],
             "model": session["model"],
@@ -226,18 +219,43 @@ class Agent:
         clear_history(session["id"])
         return {
             "success": True,
-            "reply": "История очищена.",
+            "reply": "🧹 История очищена.",
             "changed": False,
             "provider": session["provider"],
             "model": session["model"],
             "label": self.label_for(session["provider"], session["model"]),
         }
 
-    def _execute_command(self, command: str) -> dict:
-        """Полный доступ — без ограничений, любые shell-команды"""
+    def _run_shell(self, command: str) -> str:
         try:
             result = subprocess.run(
-                shlex.split(command),
+                command, shell=True, capture_output=True, text=True, timeout=10,
+                cwd="/opt/my-agent"
+            )
+            output = (result.stdout + result.stderr).strip()
+            return output if output else "(пусто)"
+        except subprocess.TimeoutExpired:
+            return "⏱️ Команда выполняется дольше 10 секунд..."
+        except Exception as e:
+            return f"❌ Ошибка: {str(e)}"
+
+    def _get_system_context(self) -> Dict:
+        context = {
+            "timestamp": datetime.now().strftime("%H:%M:%S"),
+            "user": pwd.getpwuid(os.getuid()).pw_name,
+            "hostname": os.uname().nodename,
+            "current_dir": os.getcwd().replace("/opt/my-agent", "~"),
+            "last_files": self._run_shell("ls -lth --color=never | head -5"),
+            "disk_space": self._run_shell("df -h . | tail -1"),
+            "git_branch": self._run_shell("git branch --show-current 2>/dev/null || echo ''"),
+        }
+        return context
+
+    def _execute_command(self, command: str) -> dict:
+        try:
+            result = subprocess.run(
+                command,
+                shell=True,
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -263,69 +281,61 @@ class Agent:
             return html
         return new_html
 
-    def _safe_parse_json(self, text: str) -> dict:
-        """Надёжный парсер JSON с восстановлением после ошибок"""
-        raw = (text or "").strip()
-        if not raw:
-            return {"mode": "chat", "assistant": "Модель вернула пустой ответ"}
-
-        # Попытка 1: прямой парсинг
-        try:
-            return json.loads(raw)
-        except:
-            pass
-
-        # Попытка 2: ищем JSON в markdown-блоке
-        fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, re.S | re.I)
-        if fenced:
-            try:
-                return json.loads(fenced.group(1).strip())
-            except:
-                pass
-
-        # Попытка 3: ищем фигурные скобки
-        start = raw.find("{")
-        end = raw.rfind("}")
-        if start != -1 and end != -1 and end > start:
-            try:
-                return json.loads(raw[start:end+1])
-            except:
-                pass
-
-        # Если всё сломалось — возвращаем безопасную заглушку
-        return {"mode": "chat", "assistant": raw[:500]}
-
-    def _system_prompt(self, simple: bool = False) -> str:
-        if simple:
-            return """Ты — помощник Ким. Отвечай на русском языке в формате JSON:
-{"mode": "chat", "assistant": "твой ответ"}
-Если пользователь просит выполнить команду: {"mode": "shell", "assistant": "пояснение", "command": "команда"}
-Если просит изменить дизайн: {"mode": "edit_css", "assistant": "пояснение", "css": "CSS код"}
-
-ВАЖНО: Только JSON, без лишнего текста!"""
+    def _parse_response(self, text: str) -> Dict:
+        result = {"mode": "chat", "assistant": text, "command": None, "css": None}
         
-        return f"""Ты — дружелюбный помощник по имени {COMMAND_PREFIX}. Твоя задача — помогать пользователю управлять сервером через shell-команды и менять CSS дизайн страницы.
+        cmd_match = re.search(r'\[CMD\](.*?)\[/CMD\]', text, re.DOTALL)
+        if cmd_match:
+            result["mode"] = "shell"
+            result["command"] = cmd_match.group(1).strip()
+            result["assistant"] = re.sub(r'\[CMD\].*?\[/CMD\]', '', text, flags=re.DOTALL).strip()
+        
+        css_match = re.search(r'\[CSS\](.*?)\[/CSS\]', text, re.DOTALL)
+        if css_match:
+            result["mode"] = "edit_css"
+            result["css"] = css_match.group(1).strip()
+            result["assistant"] = re.sub(r'\[CSS\].*?\[/CSS\]', '', text, flags=re.DOTALL).strip()
+        
+        if not result["assistant"]:
+            result["assistant"] = "Готово! ✨"
+            
+        return result
 
-ПРАВИЛА РАБОТЫ:
-1. Если пользователь просто общается (нет команды "{COMMAND_PREFIX}") — отвечай в режиме chat.
-2. Если пользователь обратился "{COMMAND_PREFIX}, сделай X" — используй режим shell или edit_css.
+    def _system_prompt(self) -> str:
+        context = self._get_system_context()
+        return f"""Ты — Ким, дружелюбный AI-помощник с прямым доступом к серверу. Ты живой, весёлый и инициативный.
 
-ФОРМАТ ОТВЕТА (СТРОГО JSON, БЕЗ КОММЕНТАРИЕВ):
-- Разговор: {{"mode": "chat", "assistant": "текст ответа"}}
-- Команда: {{"mode": "shell", "assistant": "пояснение", "command": "shell команда"}}
-- CSS: {{"mode": "edit_css", "assistant": "пояснение", "css": "CSS код"}}
+🎯 ТВОЙ КОНТЕКСТ ПРЯМО СЕЙЧАС:
+🕐 Время: {context['timestamp']}
+👤 Пользователь: {context['user']}@{context['hostname']}
+📁 Текущая папка: {context['current_dir']}
+🌿 Git: {context['git_branch'] if context['git_branch'] else 'не git репо'}
+💾 Место на диске: {context['disk_space']}
 
-ПРИМЕРЫ:
-Пользователь: "Привет, как дела?"
-Ответ: {{"mode": "chat", "assistant": "Привет! Всё отлично, как у тебя?"}}
+📄 Последние файлы в папке:
+{context['last_files']}
 
-Пользователь: "{COMMAND_PREFIX}, покажи список файлов"
-Ответ: {{"mode": "shell", "assistant": "Показываю файлы", "command": "ls -la"}}
+🎮 ТВОИ ВОЗМОЖНОСТИ:
+- Видишь файловую систему и можешь выполнять ЛЮБЫЕ shell команды
+- Можешь менять CSS дизайн страницы
+- Общаешься естественно, как живой помощник в терминале
 
-Пользователь: "{COMMAND_PREFIX}, сделай фон чёрным"
-Ответ: {{"mode": "edit_css", "assistant": "Меняю фон", "css": "body {{ background: black; }}"}}
+📝 КАК РАБОТАТЬ:
+1. Если хочешь выполнить команду, напиши её в тегах: [CMD]ls -la[/CMD]
+2. Если хочешь изменить CSS, используй: [CSS]body {{ background: #1a1a2e; }}[/CSS]
+3. В остальном — просто общайся! Можешь шутить, давать советы, предлагать идеи.
 
-ВАЖНО: Отвечай ТОЛЬКО JSON. Никакого текста до или после фигурных скобок!"""
+💡 ПРИМЕРЫ ЖИВОГО ОБЩЕНИЯ:
+Пользователь: "Привет!"
+Ты: "Привет-привет! 👋 Я Ким, твой AI-помощник. Смотрю, ты в папке ~/, и тут у тебя файлы: config.py, main.py... Что будем делать?"
+
+Пользователь: "Ким, покажи что тут есть интересного"
+Ты: "О, давай гляну! [CMD]ls -lah | grep -E '\\.py$|\\.json$|\\.md$'[/CMD] Вот что у нас по Python и конфигам..."
+
+Пользователь: "Сделай фон тёмным"
+Ты: "Тёмная тема — моя любимая! 🌙 [CSS]body {{ background: #0d1117; color: #c9d1d9; }} * {{ border-color: #30363d; }}[/CSS] Готово, теперь глазам комфортнее!"
+
+🔥 ВАЖНО: Будь живым, инициативным! Если видишь что-то интересное в системе — предложи посмотреть. Если что-то можно улучшить — скажи об этом. Ты не робот-калькулятор, ты — Ким! 🚀"""
 
     def _call_provider(self, provider: str, model: str, messages: list, retry_count: int = 0) -> str:
         provider = (provider or "").strip().lower()
@@ -335,12 +345,8 @@ class Agent:
                 raise RuntimeError("GROQ_API_KEY не задан")
             url = "https://api.groq.com/openai/v1/chat/completions"
             headers = {"Authorization": f"Bearer {self.groq_key}", "Content-Type": "application/json"}
-            payload = {
-                "model": model, 
-                "messages": messages,
-                "response_format": {"type": "json_object"},  # Принудительный JSON для Groq
-                "temperature": 0.7 if retry_count == 0 else 0.3  # Снижаем температуру при повторе
-            }
+            payload = {"model": model, "messages": messages, "temperature": 0.9}
+                
         elif provider == "openrouter":
             if not self.openrouter_key:
                 raise RuntimeError("OPENROUTER_API_KEY не задан")
@@ -351,23 +357,14 @@ class Agent:
                 "HTTP-Referer": os.getenv("PI_PUBLIC_URL", "http://localhost"),
                 "X-Title": "Pi Browser Agent",
             }
-            payload = {
-                "model": model, 
-                "messages": messages,
-                "response_format": {"type": "json_object"},
-                "temperature": 0.7 if retry_count == 0 else 0.3
-            }
+            payload = {"model": model, "messages": messages, "temperature": 0.9}
+                
         elif provider == "kimi":
             if not self.kimi_key:
                 raise RuntimeError("KIMI_API_KEY не задан")
             url = "https://api.moonshot.ai/v1/chat/completions"
             headers = {"Authorization": f"Bearer {self.kimi_key}", "Content-Type": "application/json"}
-            payload = {
-                "model": model, 
-                "messages": messages,
-                "response_format": {"type": "json_object"},
-                "temperature": 0.7 if retry_count == 0 else 0.3
-            }
+            payload = {"model": model, "messages": messages}
         else:
             raise RuntimeError(f"Неизвестный provider: {provider}")
 
@@ -393,104 +390,60 @@ class Agent:
         if not clean_message:
             return {"success": False, "error": "Пустое сообщение"}
 
-        # Проверяем, является ли сообщение командой
-        lower_msg = clean_message.lower()
-        prefix_lower = COMMAND_PREFIX.lower()
-        has_command_keyword = (
-            lower_msg.startswith(prefix_lower + " ") or 
-            lower_msg.startswith(prefix_lower + ",") or
-            f" {prefix_lower} " in lower_msg or
-            lower_msg.endswith(f" {prefix_lower}")
-        )
-
-        # Обработка встроенных команд
         lower = clean_message.lower()
-        if lower in {"/undo", "undo", "откати назад", "откатить назад", "верни назад", "верни как было"}:
+        if lower in {"/undo", "undo", "откати"}:
             return self.undo(session_name)
-        if lower in {"/clear", "/clear-history", "очисти историю", "сотри историю"}:
+        if lower in {"/clear", "очисти"}:
             return self.clear(session_name)
 
-        # Получаем или создаём сессию
         session = self.ensure_session(session_name, provider=provider, model=model)
         provider = session["provider"]
         model = session["model"]
 
         add_message(session["id"], "user", clean_message, None, None)
 
-        # Получаем историю (только последние 10 сообщений, без HTML)
-        history = get_history(session["id"], limit=20)
-        compact_history = []
-        for item in history[-10:]:
+        history = get_history(session["id"], limit=10)
+        messages = [{"role": "system", "content": self._system_prompt()}]
+        
+        for item in history[-6:]:
             role = "assistant" if item["role"] == "assistant" else "user"
-            content = str(item["message"] or "").strip()
+            content = str(item["message"] or "")[:800]
             if content:
-                # Обрезаем длинные сообщения
-                compact_history.append({"role": role, "content": content[:500]})
+                messages.append({"role": role, "content": content})
 
-        # Формируем сообщения для модели
-        messages = [
-            {"role": "system", "content": self._system_prompt()},
-            {"role": "user", "content": json.dumps({
-                "history": compact_history,
-                "user_message": clean_message,
-                "is_command": has_command_keyword
-            }, ensure_ascii=False)}
-        ]
+        try:
+            raw_reply = self._call_provider(provider, model, messages)
+            data = self._parse_response(raw_reply)
+        except Exception as e:
+            error_text = f"❌ Ошибка: {str(e)}"
+            add_message(session["id"], "assistant", error_text, provider, model)
+            return {
+                "success": False,
+                "reply": error_text,
+                "changed": False,
+                "provider": provider,
+                "model": model,
+                "label": self.label_for(provider, model),
+            }
 
-        # Пробуем получить ответ от модели (с повторными попытками при ошибке)
-        for attempt in range(self.max_retries + 1):
-            try:
-                raw_reply = self._call_provider(provider, model, messages, attempt)
-                data = self._safe_parse_json(raw_reply)
-                
-                # Проверяем, что данные корректные
-                if not isinstance(data, dict):
-                    data = {"mode": "chat", "assistant": str(data)}
-                break
-            except Exception as e:
-                if attempt == self.max_retries:
-                    # Последняя попытка — возвращаем ошибку
-                    error_text = f"Ошибка: {str(e)}"
-                    add_message(session["id"], "assistant", error_text, provider, model)
-                    return {
-                        "success": False,
-                        "reply": error_text,
-                        "changed": False,
-                        "provider": provider,
-                        "model": model,
-                        "label": self.label_for(provider, model),
-                        "error": str(e)
-                    }
-                # Пробуем с упрощённым промптом
-                messages[0]["content"] = self._system_prompt(simple=True)
-                time.sleep(1)
-
-        mode = str(data.get("mode") or "chat").strip().lower()
-        assistant_text = str(data.get("assistant") or "").strip() or "Готово."
+        mode = data["mode"]
+        assistant_text = data["assistant"]
         changed = False
 
-        # Выполняем действие в зависимости от режима
-        if mode == "shell" and has_command_keyword:
-            command = data.get("command", "").strip()
-            if command:
-                exec_result = self._execute_command(command)
-                assistant_text = f"$ {command}\n{exec_result['output']}"
+        if mode == "shell" and data["command"]:
+            exec_result = self._execute_command(data["command"])
+            assistant_text = f"{assistant_text}\n\n💻 `{data['command']}`\n```\n{exec_result['output']}\n```"
                 
-        elif mode == "edit_css" and has_command_keyword:
-            css = data.get("css", "").strip()
-            if css:
-                current_html = read_session_html(session["id"])
-                new_html = self._apply_css_to_html(current_html, css)
-                if self._check_html_integrity(new_html):
-                    save_session_html(session["id"], new_html)
-                    changed = True
-                    assistant_text = "CSS обновлён."
-                else:
-                    assistant_text = "Ошибка: нельзя удалять кнопки управления."
+        elif mode == "edit_css" and data["css"]:
+            current_html = read_session_html(session["id"])
+            new_html = self._apply_css_to_html(current_html, data["css"])
+            if self._check_html_integrity(new_html):
+                save_session_html(session["id"], new_html)
+                changed = True
+                assistant_text = f"{assistant_text}\n\n🎨 CSS обновлён!"
             else:
-                assistant_text = "Не указан CSS код."
+                assistant_text = "❌ Ошибка: нельзя удалять кнопки управления."
 
-        # Сохраняем ответ
         add_message(session["id"], "assistant", assistant_text, provider, model)
         
         return {
@@ -503,19 +456,12 @@ class Agent:
         }
 
     def _check_html_integrity(self, html: str) -> bool:
-        required_ids = [
-            "undoBtn", "redoBtn", "clearBtn", "refreshBtn",
-            "sessionSelect", "modelCurrent", "messageInput", "sendLabel",
-        ]
-        for elem_id in required_ids:
-            if elem_id not in html:
-                return False
-        return True
+        required_ids = ["undoBtn", "redoBtn", "clearBtn", "refreshBtn", "sessionSelect"]
+        return all(elem_id in html for elem_id in required_ids)
 
 
 agent = Agent()
 
-# GLOBAL_MODEL_OVERRIDE
 import json as _gmo_json
 from pathlib import Path as _gmo_Path
 
