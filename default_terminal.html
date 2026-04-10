@@ -972,7 +972,10 @@ body::after {
       return raw;
     }
 
-    function renderHistory(items) {
+       function renderHistory(items) {
+      // 1. Проверяем, был ли пользователь внизу перед обновлением
+      const isUserAtBottom = chatDiv.scrollHeight - chatDiv.scrollTop - chatDiv.clientHeight < 10;
+      
       chatDiv.innerHTML = '';
       if (!items || !items.length) return;
       for (const item of items) {
@@ -993,7 +996,11 @@ body::after {
         }
         chatDiv.appendChild(wrap);
       }
-      chatDiv.scrollTop = chatDiv.scrollHeight;
+      
+      // 2. Прокручиваем вниз ТОЛЬКО если пользователь уже был внизу
+      if (isUserAtBottom) {
+        chatDiv.scrollTop = chatDiv.scrollHeight;
+      }
     }
 
     function renderModelDock() {
