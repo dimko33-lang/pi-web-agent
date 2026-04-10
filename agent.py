@@ -22,6 +22,7 @@ from db import (
 
 COMMAND_PREFIX = "Ким"
 
+
 class Agent:
     GROQ_LABELS = {
         "openai/gpt-oss-120b": "GPT-OSS 120B",
@@ -230,6 +231,7 @@ class Agent:
         }
 
     def _execute_command(self, command: str) -> dict:
+        """Полный доступ — без ограничений, любые shell-команды"""
         try:
             result = subprocess.run(
                 shlex.split(command),
@@ -248,38 +250,30 @@ class Agent:
             return {"output": str(e), "exit_code": -1}
 
     def _apply_css_to_html(self, html: str, css: str) -> str:
-        """Вставляет CSS агента в конец head, удаляя предыдущий блок."""
         style_tag = f'<style id="agent-style">\n{css}\n</style>'
-        # Удаляем предыдущий блок с id="agent-style", если был
         html = re.sub(r'<style\s+id="agent-style">.*?</style>', '', html, flags=re.DOTALL)
-        # Вставляем новый блок перед закрывающим </head>
         if '</head>' in html:
             new_html = html.replace('</head>', f'{style_tag}\n</head>')
         else:
             new_html = html + style_tag
+        if not self._check_html_integrity(new_html):
+            return html
         return new_html
 
     def _extract_json(self, text: str) -> dict:
-        """Извлекает JSON из ответа модели. Если не удалось – возвращает словарь с mode='chat' и текстом ответа."""
         raw = (text or "").strip()
         if not raw:
             raise ValueError("Модель вернула пустой ответ")
-        
-        # Попытка 1: прямой парсинг
         try:
             return json.loads(raw)
         except Exception:
             pass
-        
-        # Попытка 2: извлечение из блока кода ```json ... ```
         fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, re.S | re.I)
         if fenced:
             try:
                 return json.loads(fenced.group(1).strip())
             except Exception:
                 pass
-        
-        # Попытка 3: найти первую { и последнюю }
         start = raw.find("{")
         end = raw.rfind("}")
         if start != -1 and end != -1 and end > start:
@@ -287,8 +281,6 @@ class Agent:
                 return json.loads(raw[start:end+1])
             except Exception:
                 pass
-        
-        # Если ничего не получилось – возвращаем fallback: весь ответ как chat
         raise ValueError("Модель вернула невалидный JSON (fallback)")
 
     def _system_prompt(self) -> str:
@@ -352,7 +344,6 @@ class Agent:
         if not clean_message:
             return {"success": False, "error": "Пустое сообщение"}
 
-        # Проверка на ключевое слово "Ким"
         lower_msg = clean_message.lower()
         prefix_lower = COMMAND_PREFIX.lower()
         has_command_keyword = (lower_msg.startswith(prefix_lower + " ") or 
@@ -402,13 +393,11 @@ class Agent:
             },
         ]
 
-        # Вызов модели и обработка ответа
         try:
             raw_reply = self._call_provider(provider, model, messages)
             try:
                 data = self._extract_json(raw_reply)
             except ValueError:
-                # Если JSON невалидный – превращаем весь ответ в chat-режим
                 data = {"mode": "chat", "assistant": raw_reply.strip()}
         except Exception as e:
             error_text = f"Ошибка обработки ответа модели: {str(e)}"
@@ -427,7 +416,6 @@ class Agent:
         assistant_text = str(data.get("assistant") or "").strip() or "Готово."
         changed = False
 
-        # Команды выполняются ТОЛЬКО при наличии ключевого слова
         if mode == "shell" and has_command_keyword:
             command = data.get("command", "").strip()
             if command:
@@ -530,7 +518,9 @@ agent = Agent()
 # GLOBAL_MODEL_OVERRIDE
 import json as _gmo_json
 from pathlib import Path as _gmo_Path
+
 _GMO_FILE = _gmo_Path("/opt/my-agent/global_model.json")
+
 def _gmo_load():
     try:
         data = _gmo_json.loads(_GMO_FILE.read_text(encoding="utf-8"))
@@ -541,11 +531,13 @@ def _gmo_load():
     except Exception:
         pass
     return None, None
-if not getattr(Agent.chat, "__name__", "") == "_agent_chat_with_global_model":
-    _AGENT_CHAT_ORIG = Agent.chat
-    def _agent_chat_with_global_model(self, session_name: str, message: str, provider=None, model=None):
-        gp, gm = _gmo_load()
-        if gp and gm:
-            provider, model = gp, gm
-        return _AGENT_CHAT_ORIG(self, session_name, message, provider=provider, model=model)
-    Agent.chat = _agent_chat_with_global_model
+
+_original_chat = Agent.chat
+
+def _patched_chat(self, session_name: str, message: str, provider=None, model=None):
+    gp, gm = _gmo_load()
+    if gp and gm:
+        provider, model = gp, gm
+    return _original_chat(self, session_name, message, provider=provider, model=model)
+
+Agent.chat = _patched_chat
