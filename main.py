@@ -16,7 +16,6 @@ from db import (
     last_message_id,
     list_sessions,
     read_session_html,
-    SESSIONS_DIR,
 )
 
 app = Flask(__name__)
@@ -143,17 +142,7 @@ def index():
         target = "private" if admin_mode else ALIAS_MAP[alias]
 
     session = get_session(target)
-    
-    # Загружаем HTML по имени сессии
-    session_html_path = SESSIONS_DIR / f"session_{session['name']}.html"
-    if not session_html_path.exists():
-        default_path = SESSIONS_DIR / "session_1.html"
-        if default_path.exists():
-            session_html_path.write_text(default_path.read_text(encoding="utf-8"), encoding="utf-8")
-        else:
-            session_html_path.write_text(read_session_html(session["id"]), encoding="utf-8")
-    
-    html = session_html_path.read_text(encoding="utf-8")
+    html = read_session_html(session["id"])
 
     resp = make_response(Response(html, mimetype="text/html; charset=utf-8"))
     resp.set_cookie("pi_alias", alias, max_age=86400*30, httponly=False, samesite="Lax")
